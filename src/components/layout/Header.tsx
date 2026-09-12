@@ -1,4 +1,5 @@
-import { Menu, Bell, Search } from 'lucide-react';
+import { Menu, Bell } from 'lucide-react';
+import GlobalSearch from './GlobalSearch';
 
 interface HeaderProps {
   title: string;
@@ -25,10 +26,7 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-400 md:flex">
-          <Search size={16} />
-          <span>Search students, classes...</span>
-        </div>
+        <GlobalSearch />
         <button type="button" className="relative rounded-md p-2 text-navy-700 hover:bg-slate-100" aria-label="Notifications">
           <Bell size={18} />
           <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-gold-500" />

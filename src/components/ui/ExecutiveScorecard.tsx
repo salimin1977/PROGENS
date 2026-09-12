@@ -1,15 +1,11 @@
 import type { KpiTarget } from '../../types';
 import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 
-function statusFor(item: KpiTarget): { label: string; tone: string; icon: typeof CheckCircle2 } {
-  const met = item.higherIsBetter ? item.current >= item.target : item.current <= item.target;
-  const gap = item.higherIsBetter ? item.target - item.current : item.current - item.target;
-  const closeThreshold = item.unit === 'gps' ? 0.15 : item.unit === '%' ? 3 : 3;
-
-  if (met) return { label: 'On Target', tone: 'text-teal-700 bg-teal-50', icon: CheckCircle2 };
-  if (gap <= closeThreshold) return { label: 'Near Target', tone: 'text-gold-700 bg-gold-50', icon: AlertTriangle };
-  return { label: 'Improvement Required', tone: 'text-rose-700 bg-rose-50', icon: XCircle };
-}
+const TRAFFIC_LIGHT_STYLE: Record<KpiTarget['trafficLight'], { label: string; tone: string; icon: typeof CheckCircle2 }> = {
+  GREEN: { label: 'On Target', tone: 'text-teal-700 bg-teal-50', icon: CheckCircle2 },
+  AMBER: { label: 'Near Target', tone: 'text-gold-700 bg-gold-50', icon: AlertTriangle },
+  RED: { label: 'Improvement Required', tone: 'text-rose-700 bg-rose-50', icon: XCircle },
+};
 
 function formatValue(value: number, unit: KpiTarget['unit']): string {
   if (unit === '%') return `${value}%`;
@@ -29,7 +25,7 @@ export default function ExecutiveScorecard({ items }: { items: KpiTarget[] }) {
             {items
               .filter((i) => i.category === category)
               .map((item) => {
-                const status = statusFor(item);
+                const status = TRAFFIC_LIGHT_STYLE[item.trafficLight];
                 const Icon = status.icon;
                 const gap = Math.abs(item.current - item.target);
                 return (

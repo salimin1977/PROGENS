@@ -4,7 +4,7 @@ import StatusBadge from './StatusBadge';
 import ProgressBar from './ProgressBar';
 
 export default function InterventionCard({ intervention }: { intervention: Intervention }) {
-  const tone = intervention.status === 'Completed' ? 'teal' : intervention.status === 'Critical' ? 'rose' : 'gold';
+  const tone = intervention.status === 'COMPLETED' || intervention.status === 'CLOSED' ? 'teal' : intervention.riskLevel === 'CRITICAL' ? 'rose' : 'gold';
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between gap-2">
@@ -12,11 +12,14 @@ export default function InterventionCard({ intervention }: { intervention: Inter
           <p className="text-sm font-bold text-navy-950">{intervention.studentName}</p>
           <p className="text-xs text-slate-500">{intervention.className}</p>
         </div>
-        <StatusBadge status={intervention.status} />
+        <div className="flex flex-col items-end gap-1">
+          <StatusBadge status={intervention.riskLevel} />
+          <StatusBadge status={intervention.status} />
+        </div>
       </div>
 
       <p className="mt-3 text-sm text-navy-800">{intervention.problem}</p>
-      <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-teal-700">{intervention.interventionType}</p>
+      <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-teal-700">{intervention.category}</p>
 
       <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
         <span className="flex items-center gap-1">
@@ -32,8 +35,8 @@ export default function InterventionCard({ intervention }: { intervention: Inter
       </div>
 
       <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-navy-700">
-        <span className="font-semibold text-navy-900">Next action: </span>
-        {intervention.nextAction}
+        <span className="font-semibold text-navy-900">{intervention.outcome ? 'Outcome: ' : 'Next action: '}</span>
+        {intervention.outcome ?? intervention.nextAction}
       </div>
     </div>
   );

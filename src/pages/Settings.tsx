@@ -1,91 +1,120 @@
 import { useState } from 'react';
 import { School, CalendarRange, Target, ShieldAlert, UsersRound, Settings as SettingsIcon } from 'lucide-react';
-import { schoolProfile } from '../data/kpi';
-import { academicKpi } from '../data/academic';
-import { attendanceKpi } from '../data/attendance';
+import { getSchoolProfile } from '../services/schoolService';
+import { getDataProvider } from '../providers';
+import { useAsync } from '../hooks/useAsync';
+import AsyncSection from '../components/ui/AsyncSection';
+import type { AppRole } from '../types/schema';
 
-const USERS = [
-  { name: 'Tuan Haji Ahmad Faizal bin Othman', role: 'Principal', access: 'Full Access' },
-  { name: 'Pn. Rohana Ibrahim', role: 'Senior Assistant (Academic)', access: 'Academic & Reports' },
-  { name: 'En. Muthu Kumaran', role: 'Counsellor', access: 'Intervention & Students' },
-  { name: 'Cik Ling Wei Yee', role: 'STEM Coordinator', access: 'STEM & Academic' },
-  { name: 'En. Zulfadli Aziz', role: 'Discipline Teacher', access: 'Attendance & Students' },
+interface AppUserRow {
+  name: string;
+  role: AppRole;
+  access: string;
+}
+
+const USERS: AppUserRow[] = [
+  { name: 'Tuan Haji Ahmad Faizal bin Othman', role: 'PENGETUA', access: 'Full Access' },
+  { name: 'Pn. Rohana Ibrahim', role: 'GKMP', access: 'Academic & Reports' },
+  { name: 'En. Muthu Kumaran', role: 'COUNSELLOR', access: 'Intervention & Students' },
+  { name: 'Cik Ling Wei Yee', role: 'TEACHER', access: 'STEM & Academic' },
+  { name: 'En. Zulfadli Aziz', role: 'TEACHER', access: 'Attendance & Students' },
+  { name: 'System Administrator', role: 'ADMIN', access: 'Full System Configuration' },
 ];
 
+async function loadSettingsData() {
+  const [school, kpiTargets] = await Promise.all([getSchoolProfile(), getDataProvider().getKpiTargets()]);
+  return { school, kpiTargets };
+}
+
 export default function Settings() {
-  const [thresholds, setThresholds] = useState({ critical: 50, high: 60, moderate: 72 });
+  const [thresholds, setThresholds] = useState({ critical: 4, high: 2, medium: 1 });
+  const state = useAsync(loadSettingsData, []);
 
   return (
-    <div className="space-y-6">
-      <SettingsSection icon={School} title="School Profile">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <ReadField label="School Name" value={schoolProfile.name} />
-          <ReadField label="School Code" value={schoolProfile.code} />
-          <ReadField label="Principal" value={schoolProfile.principal} />
-          <ReadField label="Address" value={schoolProfile.address} />
-          <ReadField label="Total Students" value={schoolProfile.totalStudents.toString()} />
-          <ReadField label="Total Teachers" value={schoolProfile.totalTeachers.toString()} />
-        </div>
-      </SettingsSection>
+    <AsyncSection state={state} loadingLabel="Loading settings…">
+      {({ school, kpiTargets }) => {
+        const gpsTarget = kpiTargets.find((k) => k.kpi_name === 'GPS Semasa');
+        const gpmpTarget = kpiTargets.find((k) => k.kpi_name === 'GPMP Matematik');
+        const passRateTarget = kpiTargets.find((k) => k.kpi_name === 'Kadar Lulus');
+        const attendanceTarget = kpiTargets.find((k) => k.kpi_name === 'Kehadiran');
 
-      <SettingsSection icon={CalendarRange} title="Academic Year">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <ReadField label="Current Academic Year" value={schoolProfile.academicYear} />
-          <ReadField label="Term" value="Term 2" />
-          <ReadField label="SPM Cohort" value="Tingkatan 5, 2026" />
-        </div>
-      </SettingsSection>
+        return (
+          <div className="space-y-6">
+            <SettingsSection icon={School} title="School Profile">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <ReadField label="School Name" value={school.name} />
+                <ReadField label="School Code" value={school.code} />
+                <ReadField label="Principal" value={school.principal} />
+                <ReadField label="Address" value={school.address} />
+                <ReadField label="Total Students" value={school.totalStudents.toString()} />
+                <ReadField label="Total Teachers" value={school.totalTeachers.toString()} />
+              </div>
+            </SettingsSection>
 
-      <SettingsSection icon={Target} title="KPI Targets">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <ReadField label="GPS Target" value={academicKpi.gpsTarget.toFixed(2)} />
-          <ReadField label="GPMP Target" value={`${academicKpi.gpmpTarget}%`} />
-          <ReadField label="Pass Rate Target" value={`${academicKpi.passRateTarget}%`} />
-          <ReadField label="Attendance Target" value={`${attendanceKpi.target}%`} />
-        </div>
-      </SettingsSection>
+            <SettingsSection icon={CalendarRange} title="Academic Year">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <ReadField label="Current Academic Year" value={school.academicYear} />
+                <ReadField label="Term" value="Term 2" />
+                <ReadField label="SPM Cohort" value={`Tingkatan 5, ${school.academicYear}`} />
+              </div>
+            </SettingsSection>
 
-      <SettingsSection icon={ShieldAlert} title="Risk Threshold">
-        <p className="mb-4 text-xs text-slate-500">Adjust the academic score thresholds used to classify student risk levels.</p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <ThresholdField label="Critical below" value={thresholds.critical} onChange={(v) => setThresholds((t) => ({ ...t, critical: v }))} />
-          <ThresholdField label="High below" value={thresholds.high} onChange={(v) => setThresholds((t) => ({ ...t, high: v }))} />
-          <ThresholdField label="Moderate below" value={thresholds.moderate} onChange={(v) => setThresholds((t) => ({ ...t, moderate: v }))} />
-        </div>
-      </SettingsSection>
+            <SettingsSection icon={Target} title="KPI Targets">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <ReadField label="GPS Target" value={(gpsTarget?.target_value ?? 4.84).toFixed(2)} />
+                <ReadField label="GPMP Matematik Target" value={(gpmpTarget?.target_value ?? 5).toFixed(2)} />
+                <ReadField label="Pass Rate Target" value={`${passRateTarget?.target_value ?? 95}%`} />
+                <ReadField label="Attendance Target" value={`${attendanceTarget?.target_value ?? 97}%`} />
+              </div>
+            </SettingsSection>
 
-      <SettingsSection icon={UsersRound} title="User Management">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-                <th className="px-3 py-2 font-semibold">Name</th>
-                <th className="px-3 py-2 font-semibold">Role</th>
-                <th className="px-3 py-2 font-semibold">Access Level</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {USERS.map((u) => (
-                <tr key={u.name}>
-                  <td className="px-3 py-3 font-medium text-navy-950">{u.name}</td>
-                  <td className="px-3 py-3 text-slate-600">{u.role}</td>
-                  <td className="px-3 py-3 text-slate-600">{u.access}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </SettingsSection>
+            <SettingsSection icon={ShieldAlert} title="Risk Threshold">
+              <p className="mb-4 text-xs text-slate-500">
+                Number of G-grade subjects that classifies a student at each risk level (see the Risk Engine — docs/risk-engine.md).
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <ThresholdField label="Critical at or above" value={thresholds.critical} onChange={(v) => setThresholds((t) => ({ ...t, critical: v }))} />
+                <ThresholdField label="High at or above" value={thresholds.high} onChange={(v) => setThresholds((t) => ({ ...t, high: v }))} />
+                <ThresholdField label="Medium at or above" value={thresholds.medium} onChange={(v) => setThresholds((t) => ({ ...t, medium: v }))} />
+              </div>
+            </SettingsSection>
 
-      <SettingsSection icon={SettingsIcon} title="System Configuration">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <ReadField label="Data Source" value="Mock Dataset (Prototype)" />
-          <ReadField label="Planned Backend" value="Supabase (PostgreSQL)" />
-          <ReadField label="Authentication" value="Not yet configured" />
-          <ReadField label="Last Sync" value="Local prototype — no live sync" />
-        </div>
-      </SettingsSection>
-    </div>
+            <SettingsSection icon={UsersRound} title="User Management">
+              <p className="mb-3 text-xs text-slate-500">Access roles prepared for Supabase Row Level Security: ADMIN, PENGETUA, GKMP, TEACHER, COUNSELLOR, VIEWER.</p>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[520px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                      <th className="px-3 py-2 font-semibold">Name</th>
+                      <th className="px-3 py-2 font-semibold">Role</th>
+                      <th className="px-3 py-2 font-semibold">Access Level</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {USERS.map((u) => (
+                      <tr key={u.name}>
+                        <td className="px-3 py-3 font-medium text-navy-950">{u.name}</td>
+                        <td className="px-3 py-3 text-slate-600">{u.role}</td>
+                        <td className="px-3 py-3 text-slate-600">{u.access}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </SettingsSection>
+
+            <SettingsSection icon={SettingsIcon} title="System Configuration">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <ReadField label="Data Source" value="Mock Dataset (DataProvider: mock)" />
+                <ReadField label="Planned Backend" value="Supabase (PostgreSQL)" />
+                <ReadField label="Authentication" value="Not yet configured" />
+                <ReadField label="Last Sync" value="Local prototype — no live sync" />
+              </div>
+            </SettingsSection>
+          </div>
+        );
+      }}
+    </AsyncSection>
   );
 }
 

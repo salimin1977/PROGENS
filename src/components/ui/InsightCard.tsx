@@ -31,6 +31,10 @@ export default function InsightCard({ insight }: { insight: AiInsight }) {
           <dt className="font-semibold uppercase tracking-wide text-teal-700">Action</dt>
           <dd className="font-medium text-navy-900">{insight.action}</dd>
         </div>
+        <div>
+          <dt className="font-semibold uppercase tracking-wide text-rose-500">If nothing is done?</dt>
+          <dd className="text-navy-800">{insight.whatIfNothing}</dd>
+        </div>
       </dl>
     </div>
   );

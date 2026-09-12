@@ -4,51 +4,55 @@ import RiskCard from '../components/ui/RiskCard';
 import InterventionCard from '../components/ui/InterventionCard';
 import FilterBar from '../components/ui/FilterBar';
 import EmptyState from '../components/ui/EmptyState';
-import { interventions, interventionSummary } from '../data/interventions';
-import { students } from '../data/students';
+import AsyncSection from '../components/ui/AsyncSection';
+import { useAsync } from '../hooks/useAsync';
+import { getInterventionSummary, listInterventions } from '../services/interventionService';
+import type { InterventionStatus } from '../types';
 
-const STATUSES = ['Critical', 'Active', 'Monitoring', 'Completed'];
+const STATUSES: InterventionStatus[] = ['PLANNED', 'ACTIVE', 'COMPLETED', 'CLOSED'];
+
+async function loadInterventionPage(search: string, status: string) {
+  const [interventions, summary] = await Promise.all([
+    listInterventions({ search: search || undefined, status: (status as InterventionStatus) || undefined }),
+    getInterventionSummary(),
+  ]);
+  return { interventions, summary };
+}
 
 export default function Intervention() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const state = useAsync(() => loadInterventionPage(search, statusFilter), [search, statusFilter]);
 
-  const filtered = useMemo(() => {
-    return interventions.filter((i) => {
-      if (search && !i.studentName.toLowerCase().includes(search.toLowerCase())) return false;
-      if (statusFilter && i.status !== statusFilter) return false;
-      return true;
-    });
-  }, [search, statusFilter]);
-
-  const criticalStudents = students.filter((s) => s.riskLevel === 'Critical').length;
-  const highRiskStudents = students.filter((s) => s.riskLevel === 'High').length;
+  const filters = useMemo(
+    () => [{ label: 'Status', value: statusFilter, onChange: setStatusFilter, options: STATUSES.map((s) => ({ label: s, value: s })) }],
+    [statusFilter]
+  );
 
   return (
-    <div className="space-y-6">
-      <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <RiskCard label="Critical Students" count={criticalStudents} tone="critical" />
-        <RiskCard label="High-Risk Students" count={highRiskStudents} tone="high" />
-        <RiskCard label="Active Interventions" count={interventionSummary.active} tone="moderate" />
-        <RiskCard label="Completed Interventions" count={interventionSummary.completed} tone="low" />
-      </section>
+    <AsyncSection state={state} loadingLabel="Loading intervention command…">
+      {({ interventions, summary }) => (
+        <div className="space-y-6">
+          <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <RiskCard label="Critical Students" count={summary.criticalStudents} tone="critical" />
+            <RiskCard label="High-Risk Students" count={summary.highRiskStudents} tone="high" />
+            <RiskCard label="Active Interventions" count={summary.active} tone="moderate" />
+            <RiskCard label="Completed Interventions" count={summary.completed} tone="low" />
+          </section>
 
-      <FilterBar
-        searchValue={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search by student name..."
-        filters={[{ label: 'Status', value: statusFilter, onChange: setStatusFilter, options: STATUSES.map((s) => ({ label: s, value: s })) }]}
-      />
+          <FilterBar searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search by student name..." filters={filters} />
 
-      {filtered.length === 0 ? (
-        <EmptyState icon={LifeBuoy} title="No intervention cases match your filters" description="Adjust filters or search to view active cases." />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((i) => (
-            <InterventionCard key={i.id} intervention={i} />
-          ))}
+          {interventions.length === 0 ? (
+            <EmptyState icon={LifeBuoy} title="No intervention cases match your filters" description="Adjust filters or search to view active cases." />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {interventions.map((i) => (
+                <InterventionCard key={i.id} intervention={i} />
+              ))}
+            </div>
+          )}
         </div>
       )}
-    </div>
+    </AsyncSection>
   );
 }

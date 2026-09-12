@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { FileText, Users, GraduationCap, CalendarCheck, LifeBuoy, FlaskConical, Landmark, Eye, Download, RefreshCw } from 'lucide-react';
-import { schoolProfile } from '../data/kpi';
+import { getSchoolProfile } from '../services/schoolService';
+import { useAsync } from '../hooks/useAsync';
+import AsyncSection from '../components/ui/AsyncSection';
 
 interface ReportType {
   id: string;
@@ -34,10 +36,13 @@ export default function Reports() {
   };
 
   const activeReport = REPORT_TYPES.find((r) => r.id === previewId);
+  const state = useAsync(getSchoolProfile, []);
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <AsyncSection state={state} loadingLabel="Loading report centre…">
+      {(schoolProfile) => (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {REPORT_TYPES.map((report) => {
           const Icon = report.icon;
           const isGenerating = generating === report.id;
@@ -103,6 +108,8 @@ export default function Reports() {
           </div>
         </div>
       )}
-    </div>
+        </div>
+      )}
+    </AsyncSection>
   );
 }

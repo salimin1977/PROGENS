@@ -1,12 +1,13 @@
-// Core domain types for PROGENS.
-// Field names mirror the eventual Supabase/PostgreSQL schema so mock data
-// can later be swapped for live queries with minimal refactoring.
+// UI view-model types. These are what pages/components render; services
+// build them from the normalized rows in src/types/schema.ts so no
+// component ever has to reshape raw database rows itself.
 
 export type Form = 'Tingkatan 1' | 'Tingkatan 2' | 'Tingkatan 3' | 'Tingkatan 4' | 'Tingkatan 5';
 
-export type RiskLevel = 'Critical' | 'High' | 'Moderate' | 'Low';
+// Matches RiskLevelDb exactly — one risk vocabulary across the whole app.
+export type RiskLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
-export type StudentStatus = 'Active' | 'On Watch' | 'Excellence Track';
+export type StudentProgressStatus = 'On Watch' | 'Active' | 'Excellence Track';
 
 export type Gender = 'Male' | 'Female';
 
@@ -14,6 +15,8 @@ export interface SubjectScore {
   subject: string;
   score: number;
   grade: string;
+  gp: number;
+  department: string;
 }
 
 export interface ProgressEvent {
@@ -31,38 +34,47 @@ export interface TalentProfile {
 
 export interface Student {
   id: string;
+  studentNo: string;
   name: string;
   gender: Gender;
   className: string;
   form: Form;
   academicScore: number;
+  gpm: number;
   attendanceRate: number;
   riskLevel: RiskLevel;
-  status: StudentStatus;
+  riskScore: number;
+  riskReasons: string[];
+  recommendedAction: string;
+  status: StudentProgressStatus;
   subjects: SubjectScore[];
   talents: TalentProfile[];
   stemTrack: boolean;
   stemReadiness: number;
   progressTimeline: ProgressEvent[];
-  guardianContact: string;
+  icLast4: string;
   photoInitials: string;
 }
 
-export type InterventionStatus = 'Critical' | 'Active' | 'Monitoring' | 'Completed';
+export type InterventionStatus = 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CLOSED';
 
 export interface Intervention {
   id: string;
   studentId: string;
   studentName: string;
   className: string;
+  category: string;
   problem: string;
-  interventionType: string;
+  objective: string;
+  strategy: string;
   teacher: string;
   startDate: string;
+  targetDate: string;
   status: InterventionStatus;
   progress: number;
+  outcome: string | null;
   nextAction: string;
-  priority: RiskLevel;
+  riskLevel: RiskLevel;
 }
 
 export interface SubjectPerformance {
@@ -115,6 +127,7 @@ export interface KpiTarget {
   target: number;
   unit: '%' | 'pts' | 'count' | 'gps';
   higherIsBetter: boolean;
+  trafficLight: 'GREEN' | 'AMBER' | 'RED';
 }
 
 export type StemStage = 'Identified' | 'Mathematics' | 'Science' | 'STEM Boost' | 'STEM Elite' | 'STEM A';
@@ -140,6 +153,7 @@ export interface AiInsight {
   why: string;
   who: string;
   action: string;
+  whatIfNothing: string;
   severity: 'info' | 'warning' | 'critical';
 }
 
