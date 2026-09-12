@@ -1,7 +1,15 @@
 import type { AttendanceByClass, AttendanceTrendEntry, RiskAttendanceBucket } from '../types';
-import { ATTENDANCE_FLAG_THRESHOLD, calculateAttendanceRate, calculateChronicAbsenceCount, calculateMonthlyAttendance } from '../engines/attendanceEngine';
+import type { AttendanceRecord } from '../types/schema';
+import {
+  ATTENDANCE_FLAG_THRESHOLD,
+  calculateAttendanceRate,
+  calculateChronicAbsenceCount,
+  calculateMonthlyAttendance,
+  type MonthlyAttendance,
+} from '../engines/attendanceEngine';
 import { loadCoreDataset } from './dataset';
 import { buildRiskLookup } from './riskLookup';
+import { getDataProvider } from '../providers';
 
 export interface AttendanceOverview {
   overallRate: number;
@@ -66,4 +74,41 @@ export async function getAttendanceOverview(): Promise<AttendanceOverview> {
 function average(nums: number[]): number {
   if (nums.length === 0) return 0;
   return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+// --- Granular attendance accessors ------------------------------------
+
+export async function getStudentAttendance(studentId: string): Promise<AttendanceRecord[]> {
+  return getDataProvider().getAttendance({ studentId });
+}
+
+export async function getClassAttendance(classId: string): Promise<AttendanceRecord[]> {
+  return getDataProvider().getAttendance({ classId });
+}
+
+/** Monthly attendance rollup, optionally scoped to one student. */
+export async function getMonthlyAttendance(studentId?: string): Promise<MonthlyAttendance[]> {
+  const records = await getDataProvider().getAttendance(studentId ? { studentId } : {});
+  return calculateMonthlyAttendance(records);
+}
+
+export interface AttendanceRiskEntry {
+  studentId: string;
+  rate: number;
+}
+
+/**
+ * Students below the attendance threshold — defaults to the standard
+ * 90% flag (ATTENDANCE_FLAG_THRESHOLD) but accepts any threshold so
+ * callers are not locked to one fixed cutoff.
+ */
+export async function getAttendanceRisk(threshold: number = ATTENDANCE_FLAG_THRESHOLD): Promise<AttendanceRiskEntry[]> {
+  const dataset = await loadCoreDataset();
+  const entries: AttendanceRiskEntry[] = [];
+  for (const student of dataset.students) {
+    const records = dataset.attendance.filter((a) => a.student_id === student.id);
+    const rate = calculateAttendanceRate(records);
+    if (rate < threshold) entries.push({ studentId: student.id, rate });
+  }
+  return entries;
 }

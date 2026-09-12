@@ -20,6 +20,7 @@ seeded mock dataset via `MockDataProvider`.
 ```bash
 npm run build    # type-check and produce a production build in dist/
 npm run test     # run the Vitest unit test suite
+npm run lint     # ESLint (flat config, typescript-eslint + react-hooks)
 npm run preview  # preview the production build locally
 ```
 
@@ -31,6 +32,7 @@ npm run preview  # preview the production build locally
 - Lucide React for icons
 - React Router for navigation
 - Vitest for unit tests
+- ESLint (`npm run lint`) — typescript-eslint + eslint-plugin-react-hooks, flat config in `eslint.config.js`
 - `@supabase/supabase-js`, wired but inactive until configured (see below)
 
 ## Modules
@@ -87,8 +89,8 @@ Full detail lives in `docs/`:
   is computed in exactly one place and unit-tested there.
 - A services layer (`src/services/`) that is the *only* code allowed to
   call the DataProvider; pages call services, never raw data.
-- Realistic seed data: ~415 students across 17 classes (Tingkatan 1-5),
-  20 teachers, 16 subjects, two assessments per year with real
+- Realistic seed data: 455 students across 17 classes (Tingkatan 1-5),
+  23 teachers, 16 subjects, two assessments per year with real
   student-level results and a sampled attendance calendar — deterministic
   and reproducible (see `src/data/seed/`).
 - Named demonstration rosters — **NOVA** (Top Tingkatan 2) and
@@ -100,6 +102,54 @@ Full detail lives in `docs/`:
   `AsyncSection`), and a data-integrity check
   (`src/utils/validation.ts`) that runs once against the dataset in dev
   mode and warns on any inconsistency instead of silently accepting it.
+
+### Phase 2 refinements
+
+A follow-up pass added the pieces an audit of the first Phase 2 build
+flagged as thin or missing, without touching the working UI:
+
+- **Named hooks** (`src/hooks/useStudents.ts`, `useStudent.ts`,
+  `useAcademic.ts`, `useAttendance.ts`, `useInterventions.ts`,
+  `useKPIs.ts`, `useRisk.ts`, `useSTEM.ts`) — thin wrappers around
+  `useAsync` + one service call each, exported from `src/hooks/index.ts`.
+  `Students`, `StudentProfile` and `Command` now call these directly;
+  other pages still call services through `useAsync` inline, which
+  satisfies the same "no page touches raw data" rule and was left alone.
+- **Granular named service methods** — `studentService` gained
+  `getStudents`, `getStudentById`, `getStudentsByForm`,
+  `getStudentsByClass`, `searchStudents`, `getStudentsByRisk`,
+  `getTopStudents`; `academicService` gained `getResults`,
+  `getStudentResults`, `getSubjectResults`, `getClassResults`,
+  `getAssessmentResults`; `attendanceService` gained
+  `getStudentAttendance`, `getClassAttendance`, `getMonthlyAttendance`,
+  and a **configurable-threshold** `getAttendanceRisk(threshold?)`;
+  `kpiService` gained `getSchoolKPIs` (the 8 named strategic KPIs —
+  GPS Semasa/Sasaran/Jurang, Jumlah Murid, Murid Berisiko, Intervensi
+  Aktif, Kehadiran, Murid Cemerlang), `getAcademicKPIs`,
+  `getAttendanceKPIs`, `getInterventionKPIs`, `getSTEMKPIs`. All are thin
+  wrappers over the existing engines/overview functions — no formula is
+  duplicated.
+- **Intervention write path** — `DataProvider` gained
+  `createIntervention`, `updateIntervention`, `closeIntervention` and
+  `addInterventionAction`, implemented identically by both
+  `MockDataProvider` (mutable in-memory state, cloned from seed data so
+  the shared seed module is never corrupted) and `SupabaseDataProvider`.
+  `interventionService` exposes matching functions plus
+  `getActiveInterventions`, `getCriticalInterventions`,
+  `getStudentInterventions`.
+- **`calculateGPI`** — an explicit alias of `calculateStudentGPM` in
+  `academicEngine.ts`, for the schools that call this figure "Gred
+  Purata Individu" rather than "Gred Purata Murid". Same formula, same
+  tests, no drift possible between the two names.
+- **Settings → Risk Threshold** now displays the risk engine's actual,
+  real thresholds (`RISK_G_COUNT_THRESHOLDS` in `riskEngine.ts`,
+  `ATTENDANCE_FLAG_THRESHOLD` in `attendanceEngine.ts`) read-only,
+  instead of a disconnected editable control that changed nothing.
+- Removed a duplicated attendance-rate calculation that had crept into
+  `studentService.ts` (now calls `attendanceEngine.calculateAttendanceRate`
+  like every other caller), and `olympusService`'s excellence-track count
+  now shares `academicEngine.isExcellentStudent` with `kpiService` instead
+  of each computing it separately.
 
 ### Data model
 

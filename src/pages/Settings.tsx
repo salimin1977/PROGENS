@@ -1,10 +1,11 @@
-import { useState } from 'react';
 import { School, CalendarRange, Target, ShieldAlert, UsersRound, Settings as SettingsIcon } from 'lucide-react';
 import { getSchoolProfile } from '../services/schoolService';
 import { getDataProvider } from '../providers';
 import { useAsync } from '../hooks/useAsync';
 import AsyncSection from '../components/ui/AsyncSection';
 import type { AppRole } from '../types/schema';
+import { RISK_G_COUNT_THRESHOLDS } from '../engines/riskEngine';
+import { ATTENDANCE_FLAG_THRESHOLD } from '../engines/attendanceEngine';
 
 interface AppUserRow {
   name: string;
@@ -27,7 +28,6 @@ async function loadSettingsData() {
 }
 
 export default function Settings() {
-  const [thresholds, setThresholds] = useState({ critical: 4, high: 2, medium: 1 });
   const state = useAsync(loadSettingsData, []);
 
   return (
@@ -70,12 +70,15 @@ export default function Settings() {
 
             <SettingsSection icon={ShieldAlert} title="Risk Threshold">
               <p className="mb-4 text-xs text-slate-500">
-                Number of G-grade subjects that classifies a student at each risk level (see the Risk Engine — docs/risk-engine.md).
+                The fixed rule the Risk Engine actually enforces (<code>src/engines/riskEngine.ts</code> — see docs/risk-engine.md). Read-only:
+                changing risk classification means changing the engine, not a dashboard setting, so student risk can never silently diverge
+                from what Intervention/SEEDS/GROW/REAP/NEXUS all see.
               </p>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <ThresholdField label="Critical at or above" value={thresholds.critical} onChange={(v) => setThresholds((t) => ({ ...t, critical: v }))} />
-                <ThresholdField label="High at or above" value={thresholds.high} onChange={(v) => setThresholds((t) => ({ ...t, high: v }))} />
-                <ThresholdField label="Medium at or above" value={thresholds.medium} onChange={(v) => setThresholds((t) => ({ ...t, medium: v }))} />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                <ReadField label="Critical at or above" value={`${RISK_G_COUNT_THRESHOLDS.CRITICAL} G grades`} />
+                <ReadField label="High at or above" value={`${RISK_G_COUNT_THRESHOLDS.HIGH} G grades`} />
+                <ReadField label="Medium at" value={`${RISK_G_COUNT_THRESHOLDS.MEDIUM} G grade`} />
+                <ReadField label="Attendance flag below" value={`${ATTENDANCE_FLAG_THRESHOLD}%`} />
               </div>
             </SettingsSection>
 
@@ -135,20 +138,6 @@ function ReadField({ label, value }: { label: string; value: string }) {
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-navy-900">{value}</p>
-    </div>
-  );
-}
-
-function ThresholdField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
-  return (
-    <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <input
-        type="number"
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-navy-900 outline-none focus:border-teal-500"
-      />
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, FileQuestion } from 'lucide-react';
-import { getStudentProfile } from '../services/studentService';
 import { listInterventions } from '../services/interventionService';
 import { getDataProvider } from '../providers';
 import { classifySeedsStudent } from '../engines/seedsEngine';
@@ -14,6 +13,7 @@ import ProgressBar from '../components/ui/ProgressBar';
 import EmptyState from '../components/ui/EmptyState';
 import AsyncSection from '../components/ui/AsyncSection';
 import { useAsync } from '../hooks/useAsync';
+import { useStudent } from '../hooks/useStudent';
 
 const TABS = ['Profile', 'Academic', 'Attendance', 'Risk', 'Intervention', 'SEEDS/GROW/REAP', 'STEM', 'Timeline'] as const;
 type Tab = (typeof TABS)[number];
@@ -37,23 +37,24 @@ function strongestDepartment(subjects: { department: string; gp: number }[]): De
   return best;
 }
 
-async function loadProfile(studentId: string) {
-  const [student, interventions, kpiTargets] = await Promise.all([
-    getStudentProfile(studentId),
+async function loadProfileExtras(studentId: string) {
+  const [interventions, kpiTargets] = await Promise.all([
     listInterventions({ studentId }),
     getDataProvider().getKpiTargets(),
   ]);
-  return { student, interventions, kpiTargets };
+  return { interventions, kpiTargets };
 }
 
 export default function StudentProfile() {
   const { studentId } = useParams<{ studentId: string }>();
   const [tab, setTab] = useState<Tab>('Profile');
-  const state = useAsync(() => loadProfile(studentId ?? ''), [studentId]);
+  const state = useStudent(studentId);
+  const extrasState = useAsync(() => loadProfileExtras(studentId ?? ''), [studentId]);
+  const { interventions, kpiTargets } = extrasState.status === 'success' ? extrasState.data : { interventions: [], kpiTargets: [] };
 
   return (
     <AsyncSection state={state} loadingLabel="Loading student profile…">
-      {({ student, interventions, kpiTargets }) => {
+      {(student) => {
         if (!student) {
           return <EmptyState icon={FileQuestion} title="Student not found" description="This student record does not exist in the current dataset." />;
         }

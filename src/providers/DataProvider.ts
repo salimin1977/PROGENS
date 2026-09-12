@@ -12,8 +12,10 @@ import type {
   DbIntervention,
   DbStudent,
   InterventionAction,
+  InterventionStatusDb,
   KpiSnapshotRow,
   KpiTargetRow,
+  RiskLevelDb,
   School,
   Subject,
   Teacher,
@@ -34,6 +36,27 @@ export interface AttendanceFilter {
 export interface InterventionFilter {
   studentId?: string;
   status?: DbIntervention['status'];
+}
+
+export interface NewInterventionInput {
+  student_id: string;
+  category: string;
+  risk_level: RiskLevelDb;
+  problem: string;
+  objective: string;
+  strategy: string;
+  teacher_id: string;
+  start_date: string;
+  target_date: string;
+  status?: InterventionStatusDb;
+}
+
+export interface UpdateInterventionInput {
+  status?: InterventionStatusDb;
+  outcome?: string | null;
+  strategy?: string;
+  objective?: string;
+  target_date?: string;
 }
 
 export interface DataProvider {
@@ -60,6 +83,15 @@ export interface DataProvider {
 
   getInterventions(filter?: InterventionFilter): Promise<DbIntervention[]>;
   getInterventionActions(interventionId: string): Promise<InterventionAction[]>;
+
+  /** Creates a new intervention case. `status` defaults to PLANNED. */
+  createIntervention(input: NewInterventionInput): Promise<DbIntervention>;
+  /** Patches an existing case (e.g. status change, revised strategy). Throws DataProviderError if the id doesn't exist. */
+  updateIntervention(id: string, patch: UpdateInterventionInput): Promise<DbIntervention>;
+  /** Convenience for the common case: mark CLOSED and record the outcome. */
+  closeIntervention(id: string, outcome: string): Promise<DbIntervention>;
+  /** Appends one entry to a case's action history. */
+  addInterventionAction(action: Omit<InterventionAction, 'id'>): Promise<InterventionAction>;
 
   getKpiTargets(): Promise<Omit<KpiTargetRow, 'status'>[]>;
   getKpiSnapshots(kpiName?: string): Promise<KpiSnapshotRow[]>;

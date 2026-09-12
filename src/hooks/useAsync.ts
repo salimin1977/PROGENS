@@ -16,6 +16,11 @@ export function useAsync<T>(loader: () => Promise<T>, deps: unknown[]): AsyncSta
 
   useEffect(() => {
     const id = ++requestId.current;
+    // Resetting to "loading" here (rather than only on mount) is
+    // deliberate: it's what lets the hook show a fresh loading state when
+    // `deps` change (e.g. a filter changes) instead of flashing stale
+    // data from the previous fetch while the new one is in flight.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setState({ status: 'loading', data: null, error: null });
 
     loader()

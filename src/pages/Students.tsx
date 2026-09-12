@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Users } from 'lucide-react';
 import FilterBar from '../components/ui/FilterBar';
@@ -7,24 +7,12 @@ import StatusBadge from '../components/ui/StatusBadge';
 import EmptyState from '../components/ui/EmptyState';
 import AsyncSection from '../components/ui/AsyncSection';
 import { useAsync } from '../hooks/useAsync';
-import { listClassNames, listStudents } from '../services/studentService';
+import { useStudents } from '../hooks/useStudents';
+import { listClassNames } from '../services/studentService';
 import type { Student, RiskLevel } from '../types';
 
 const FORMS = ['Tingkatan 1', 'Tingkatan 2', 'Tingkatan 3', 'Tingkatan 4', 'Tingkatan 5'];
 const RISK_LEVELS: RiskLevel[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
-
-async function loadStudentsPage(filters: { search: string; classFilter: string; formFilter: string; riskFilter: string }) {
-  const [students, classNames] = await Promise.all([
-    listStudents({
-      search: filters.search || undefined,
-      className: filters.classFilter || undefined,
-      form: (filters.formFilter as Student['form']) || undefined,
-      riskLevel: (filters.riskFilter as RiskLevel) || undefined,
-    }),
-    listClassNames(),
-  ]);
-  return { students, classNames };
-}
 
 export default function Students() {
   const navigate = useNavigate();
@@ -34,8 +22,14 @@ export default function Students() {
   const [formFilter, setFormFilter] = useState('');
   const [riskFilter, setRiskFilter] = useState('');
 
-  const filters = useMemo(() => ({ search, classFilter, formFilter, riskFilter }), [search, classFilter, formFilter, riskFilter]);
-  const state = useAsync(() => loadStudentsPage(filters), [filters]);
+  const state = useStudents({
+    search: search || undefined,
+    className: classFilter || undefined,
+    form: (formFilter as Student['form']) || undefined,
+    riskLevel: (riskFilter as RiskLevel) || undefined,
+  });
+  const classNamesState = useAsync(listClassNames, []);
+  const classNames = classNamesState.status === 'success' ? classNamesState.data : [];
 
   const columns: Column<Student>[] = [
     {
@@ -60,7 +54,7 @@ export default function Students() {
 
   return (
     <AsyncSection state={state} loadingLabel="Loading student directory…">
-      {({ students, classNames }) => (
+      {(students) => (
         <div className="space-y-4">
           <FilterBar
             searchValue={search}

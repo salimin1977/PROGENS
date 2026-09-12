@@ -34,6 +34,19 @@ export function calculateStudentGPM(results: AcademicResult[]): number {
   return round(average(results.map((r) => r.gp)));
 }
 
+/**
+ * GPI (Gred Purata Individu) — the same figure as GPM under a different
+ * name some Malaysian schools use for "one student's average grade
+ * point". Kept as an explicit alias rather than a second implementation
+ * so the two names can never drift apart.
+ */
+export const calculateGPI = calculateStudentGPM;
+
+/** True when every result for a student is A- (gp <= 3) or better. */
+export function isExcellentStudent(results: AcademicResult[]): boolean {
+  return results.length > 0 && results.every((r) => r.gp <= 3);
+}
+
 /** GPS — the school (or any given result set)'s average grade point. */
 export function calculateGPS(results: AcademicResult[]): number {
   return round(average(results.map((r) => r.gp)));

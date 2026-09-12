@@ -1,6 +1,7 @@
 import type { KpiTarget } from '../types';
 import type { TrafficLight } from '../types/schema';
 import { calculateKpiStatus } from '../engines/kpiEngine';
+import { isExcellentStudent } from '../engines/academicEngine';
 import { getAcademicOverview } from './academicService';
 import { getAttendanceOverview } from './attendanceService';
 import { getInterventionSummary } from './interventionService';
@@ -37,10 +38,9 @@ export async function getExecutiveScorecard(): Promise<KpiTarget[]> {
   const riskLookup = buildRiskLookup(dataset);
 
   const atRisk = dataset.students.filter((s) => ['CRITICAL', 'HIGH'].includes(riskLookup.get(s.id)?.risk_level ?? '')).length;
-  const excellenceTrack = dataset.students.filter((s) => {
-    const latest = dataset.latestResults.filter((r) => r.student_id === s.id);
-    return latest.length > 0 && latest.every((r) => r.gp <= 3);
-  }).length;
+  const excellenceTrack = dataset.students.filter((s) =>
+    isExcellentStudent(dataset.latestResults.filter((r) => r.student_id === s.id))
+  ).length;
 
   const totalInterventionCases = interventionSummary.planned + interventionSummary.active + interventionSummary.completed + interventionSummary.closed;
   const completionRate = totalInterventionCases ? Math.round((interventionSummary.completed / totalInterventionCases) * 1000) / 10 : 0;

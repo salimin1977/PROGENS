@@ -1,11 +1,29 @@
-import type { AcademicResultFilter, AttendanceFilter, DataProvider, InterventionFilter } from './DataProvider';
+import type {
+  AcademicResultFilter,
+  AttendanceFilter,
+  DataProvider,
+  InterventionFilter,
+  NewInterventionInput,
+  UpdateInterventionInput,
+} from './DataProvider';
+import { DataProviderError } from './DataProvider';
 import * as seed from '../data/seed';
+import type { DbIntervention, InterventionAction } from '../types/schema';
 
 // Wraps every call in Promise.resolve() so it behaves like a real async
 // backend (and so it can be swapped for SupabaseDataProvider without
 // changing any calling code).
 export class MockDataProvider implements DataProvider {
   readonly name = 'mock';
+
+  // Interventions/actions are cloned into instance state (rather than
+  // read straight from src/data/seed) so create/update/close can mutate
+  // them without corrupting the shared seed module — every other getter
+  // stays a direct read of the immutable seed data.
+  private interventions: DbIntervention[] = seed.interventions.map((i) => ({ ...i }));
+  private interventionActions: InterventionAction[] = seed.interventionActions.map((a) => ({ ...a }));
+  private nextInterventionId = seed.interventions.length + 1;
+  private nextActionId = seed.interventionActions.length + 1;
 
   async getSchool() {
     return seed.SCHOOL;
@@ -71,14 +89,57 @@ export class MockDataProvider implements DataProvider {
   }
 
   async getInterventions(filter: InterventionFilter = {}) {
-    let rows = seed.interventions;
+    // .slice()/.filter() both already copy — this.interventions itself is
+    // mutable (create/update push/replace into it), so callers must never
+    // get back the live internal array, only a snapshot of it.
+    let rows = this.interventions.slice();
     if (filter.studentId) rows = rows.filter((i) => i.student_id === filter.studentId);
     if (filter.status) rows = rows.filter((i) => i.status === filter.status);
     return rows;
   }
 
   async getInterventionActions(interventionId: string) {
-    return seed.interventionActions.filter((a) => a.intervention_id === interventionId);
+    return this.interventionActions.filter((a) => a.intervention_id === interventionId);
+  }
+
+  async createIntervention(input: NewInterventionInput): Promise<DbIntervention> {
+    const now = new Date().toISOString();
+    const row: DbIntervention = {
+      id: `int-new-${this.nextInterventionId++}`,
+      student_id: input.student_id,
+      category: input.category,
+      risk_level: input.risk_level,
+      problem: input.problem,
+      objective: input.objective,
+      strategy: input.strategy,
+      teacher_id: input.teacher_id,
+      start_date: input.start_date,
+      target_date: input.target_date,
+      status: input.status ?? 'PLANNED',
+      outcome: null,
+      created_at: now,
+      updated_at: now,
+    };
+    this.interventions.push(row);
+    return { ...row };
+  }
+
+  async updateIntervention(id: string, patch: UpdateInterventionInput): Promise<DbIntervention> {
+    const index = this.interventions.findIndex((i) => i.id === id);
+    if (index === -1) throw new DataProviderError(`Intervention "${id}" does not exist`);
+    const updated: DbIntervention = { ...this.interventions[index], ...patch, updated_at: new Date().toISOString() };
+    this.interventions[index] = updated;
+    return { ...updated };
+  }
+
+  async closeIntervention(id: string, outcome: string): Promise<DbIntervention> {
+    return this.updateIntervention(id, { status: 'CLOSED', outcome });
+  }
+
+  async addInterventionAction(action: Omit<InterventionAction, 'id'>): Promise<InterventionAction> {
+    const row: InterventionAction = { ...action, id: `int-new-act-${this.nextActionId++}` };
+    this.interventionActions.push(row);
+    return { ...row };
   }
 
   async getKpiTargets() {

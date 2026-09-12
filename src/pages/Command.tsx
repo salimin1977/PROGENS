@@ -1,4 +1,4 @@
-import { Users, GraduationCap, CalendarCheck, ShieldAlert, LifeBuoy, FlaskConical } from 'lucide-react';
+import { Users, GraduationCap, CalendarCheck, ShieldAlert, LifeBuoy, FlaskConical, Award } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar } from 'recharts';
 import { Link } from 'react-router-dom';
 import KPICard from '../components/ui/KPICard';
@@ -7,7 +7,7 @@ import ProgressBar from '../components/ui/ProgressBar';
 import InsightCard from '../components/ui/InsightCard';
 import AsyncSection from '../components/ui/AsyncSection';
 import { useAsync } from '../hooks/useAsync';
-import { getCommandKpis, getStrategicOverview } from '../services/kpiService';
+import { getCommandKpis, getSchoolKPIs, getStrategicOverview } from '../services/kpiService';
 import { getAcademicOverview } from '../services/academicService';
 import { getAiInsights } from '../services/analyticsService';
 import { getInterventionSummary } from '../services/interventionService';
@@ -23,8 +23,9 @@ const RISK_COLORS: Record<RiskLevel, string> = {
 };
 
 async function loadCommandData() {
-  const [kpis, overview, academic, insights, interventionSummary, dataset] = await Promise.all([
+  const [kpis, schoolKpis, overview, academic, insights, interventionSummary, dataset] = await Promise.all([
     getCommandKpis(),
+    getSchoolKPIs(),
     getStrategicOverview(),
     getAcademicOverview(),
     getAiInsights(),
@@ -36,7 +37,7 @@ async function loadCommandData() {
   const riskCounts: Record<RiskLevel, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
   for (const risk of riskLookup.values()) riskCounts[risk.risk_level]++;
 
-  return { kpis, overview, academic, insights, interventionSummary, riskCounts };
+  return { kpis, schoolKpis, overview, academic, insights, interventionSummary, riskCounts };
 }
 
 export default function Command() {
@@ -44,7 +45,7 @@ export default function Command() {
 
   return (
     <AsyncSection state={state} loadingLabel="Loading Command Centre…">
-      {({ kpis, overview, academic, insights, interventionSummary, riskCounts }) => {
+      {({ kpis, schoolKpis, overview, academic, insights, interventionSummary, riskCounts }) => {
         const riskData = (Object.keys(riskCounts) as RiskLevel[]).map((level) => ({ name: level, value: riskCounts[level] }));
         const interventionData = [
           { name: 'Planned', value: interventionSummary.planned },
@@ -57,13 +58,14 @@ export default function Command() {
         return (
           <div className="space-y-6">
             <section>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                <KPICard label="Total Students" value={kpis.totalStudents.toString()} icon={Users} tone="neutral" helperText="Across Tingkatan 1-5" />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
+                <KPICard label="Jumlah Murid" value={kpis.totalStudents.toString()} icon={Users} tone="neutral" helperText="Across Tingkatan 1-5" />
                 <KPICard label="Academic Performance" value={`${kpis.academicPerformance}%`} icon={GraduationCap} tone="positive" trend={{ direction: 'up', text: 'Pass rate' }} />
-                <KPICard label="Attendance" value={`${kpis.attendance.toFixed(1)}%`} icon={CalendarCheck} tone="positive" helperText="School average" />
-                <KPICard label="Students at Risk" value={kpis.studentsAtRisk.toString()} icon={ShieldAlert} tone="critical" helperText="Critical + High" />
-                <KPICard label="Intervention Active" value={kpis.interventionActive.toString()} icon={LifeBuoy} tone="warning" helperText="Cases in progress" />
+                <KPICard label="Kehadiran" value={`${kpis.attendance.toFixed(1)}%`} icon={CalendarCheck} tone="positive" helperText="School average" />
+                <KPICard label="Murid Berisiko" value={kpis.studentsAtRisk.toString()} icon={ShieldAlert} tone="critical" helperText="Critical + High" />
+                <KPICard label="Intervensi Aktif" value={kpis.interventionActive.toString()} icon={LifeBuoy} tone="warning" helperText="Cases in progress" />
                 <KPICard label="STEM Pipeline" value={kpis.stemPipeline.toString()} icon={FlaskConical} tone="positive" helperText="Identified candidates" />
+                <KPICard label="Murid Cemerlang" value={kpis.excellentStudents.toString()} icon={Award} tone="positive" helperText="A- or better, every subject" />
               </div>
             </section>
 
@@ -79,9 +81,10 @@ export default function Command() {
               </ChartCard>
 
               <ChartCard title="School Performance" description="Grade Purata Sekolah trajectory" className="lg:col-span-2">
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <Metric label="GPS Current" value={academic.gpsCurrent.toFixed(2)} />
-                  <Metric label="GPS Target" value={academic.gpsTarget.toFixed(2)} />
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+                  <Metric label="GPS Semasa" value={schoolKpis.gpsSemasa.toFixed(2)} />
+                  <Metric label="GPS Sasaran" value={schoolKpis.gpsSasaran.toFixed(2)} />
+                  <Metric label="Jurang" value={schoolKpis.jurang.toFixed(2)} />
                   <Metric label="Pass Rate" value={`${academic.passRate}%`} />
                   <Metric label="Students At Risk" value={kpis.studentsAtRisk.toString()} />
                 </div>

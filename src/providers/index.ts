@@ -2,7 +2,14 @@ import type { DataProvider } from './DataProvider';
 import { MockDataProvider } from './MockDataProvider';
 import { SupabaseDataProvider } from './SupabaseDataProvider';
 
-export type { DataProvider, AcademicResultFilter, AttendanceFilter, InterventionFilter } from './DataProvider';
+export type {
+  DataProvider,
+  AcademicResultFilter,
+  AttendanceFilter,
+  InterventionFilter,
+  NewInterventionInput,
+  UpdateInterventionInput,
+} from './DataProvider';
 export { DataProviderError } from './DataProvider';
 
 let cachedProvider: DataProvider | null = null;

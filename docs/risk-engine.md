@@ -14,6 +14,14 @@ than re-deriving risk from raw grades.
 | 1 | `MEDIUM` |
 | 0 | `LOW` (see modifiers below) |
 
+These numbers are the exported `RISK_G_COUNT_THRESHOLDS` constant in
+`riskEngine.ts` — not inline literals — specifically so Settings can
+display the actual rule in force (read-only) instead of an editable
+control that silently does nothing. There is no user-facing way to
+change these thresholds without changing the engine, by design: risk
+classification must never diverge between Intervention, SEEDS, GROW,
+REAP and NEXUS, which all call this same function.
+
 ## Modifiers on a 0-G student
 
 A student with no failing grade can still be flagged. `LOW` is escalated

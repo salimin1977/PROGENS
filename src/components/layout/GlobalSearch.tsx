@@ -18,10 +18,11 @@ export default function GlobalSearch() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setResults([]);
-      return;
-    }
+    // Below the 2-character minimum, just don't fetch — the dropdown is
+    // already gated on the same length check at render time, so stale
+    // `results` from a previous query never becomes visible.
+    if (query.trim().length < 2) return;
+
     let cancelled = false;
     const timer = setTimeout(() => {
       globalSearch(query).then((r) => {

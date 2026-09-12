@@ -71,3 +71,16 @@ creates an `interventions` row (plus a short `intervention_actions`
 history) only for students where `shouldIntervene` is true — so the
 seeded case list is a direct, reproducible consequence of the engines
 above, not a separately hand-curated list.
+
+## Turning a recommendation into a real case
+
+`generateInterventionRecommendation` only proposes; a teacher/counsellor
+action still has to create the case. `DataProvider` exposes
+`createIntervention`, `updateIntervention`, `closeIntervention` and
+`addInterventionAction`, implemented identically by `MockDataProvider`
+(mutable in-memory state cloned from seed data on construction — the
+shared seed module itself is never mutated) and `SupabaseDataProvider`
+(real `insert`/`update` calls). `interventionService.ts` wraps these with
+the same view-model mapping every read path uses
+(`mapInterventionRow`), so a freshly created case looks exactly like a
+seeded one to the UI.

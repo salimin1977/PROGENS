@@ -14,6 +14,11 @@ All three share the same 1-10 grade-point scale where **lower is
 better** (1 = A+, 10 = G) — the same direction the school's headline KPI
 (GPS 5.11 → target 4.84) already uses.
 
+Some schools call the student-level figure **GPI** (Gred Purata Individu)
+rather than GPM. `calculateGPI` exists as an explicit alias of
+`calculateStudentGPM` — same function, same tests — so the two names can
+never compute a different number by accident.
+
 GPMP is what powers subject bottleneck detection: the subject with the
 highest (worst) GPMP is flagged as the constraint dragging down GPS, both
 on the Academic dashboard and as a NEXUS insight.

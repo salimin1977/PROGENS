@@ -75,7 +75,6 @@ export async function loadCoreDataset(): Promise<CoreDataset> {
       academicResults: [...latestResults, ...previousResults],
     });
     if (issues.length > 0) {
-      // eslint-disable-next-line no-console
       console.warn(`[PROGENS] Dataset integrity check found ${issues.length} issue(s):`, issues);
     }
   }

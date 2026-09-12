@@ -36,7 +36,9 @@ src/
 │   └── nexusEngine.ts       Insight generation (what/why/who/action/what-if)
 ├── services/                 Orchestration: provider + engines -> view models
 ├── hooks/
-│   └── useAsync.ts           Loading/success/error state for any service call
+│   ├── useAsync.ts           Loading/success/error state for any service call
+│   └── use{Students,Student,Academic,Attendance,Interventions,KPIs,Risk,STEM}.ts
+│                              Named, single-purpose wrappers over useAsync + one service call each
 └── components, pages, ...    UI (unchanged Phase 1 visual identity)
 ```
 

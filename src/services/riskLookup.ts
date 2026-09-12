@@ -1,5 +1,5 @@
-import { calculateStudentRisk, type StudentRiskAssessment } from '../engines/riskEngine';
-import type { CoreDataset } from './dataset';
+import { calculateStudentRisk, type RiskProfile, type StudentRiskAssessment } from '../engines/riskEngine';
+import { loadCoreDataset, type CoreDataset } from './dataset';
 
 /** Computes a risk assessment for every student once, keyed by student id. */
 export function buildRiskLookup(dataset: CoreDataset): Map<string, StudentRiskAssessment> {
@@ -34,4 +34,18 @@ export function buildRiskLookup(dataset: CoreDataset): Map<string, StudentRiskAs
     );
   }
   return lookup;
+}
+
+/** Risk profile for a single student, without building the whole-dataset lookup map. */
+export async function getStudentRiskProfile(studentId: string): Promise<RiskProfile | null> {
+  const dataset = await loadCoreDataset();
+  if (!dataset.students.some((s) => s.id === studentId)) return null;
+
+  return calculateStudentRisk({
+    studentId,
+    latestResults: dataset.latestResults.filter((r) => r.student_id === studentId),
+    previousResults: dataset.previousResults.filter((r) => r.student_id === studentId),
+    attendanceRecords: dataset.attendance.filter((a) => a.student_id === studentId),
+    subjects: dataset.subjects,
+  });
 }

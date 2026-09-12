@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateGPMP, calculateGPS, calculateGradeDistribution, calculatePassRate, calculateStudentGPM } from './academicEngine';
+import { calculateGPI, calculateGPMP, calculateGPS, calculateGradeDistribution, calculatePassRate, calculateStudentGPM, isExcellentStudent } from './academicEngine';
 import type { AcademicResult, Grade } from '../types/schema';
 import { calculateGP, resultStatus } from '../utils/grading';
 
@@ -72,5 +72,26 @@ describe('calculateGradeDistribution', () => {
     expect(distribution.find((d) => d.grade === 'A+')?.count).toBe(2);
     expect(distribution.find((d) => d.grade === 'G')?.count).toBe(0);
     expect(distribution).toHaveLength(10);
+  });
+});
+
+describe('calculateGPI', () => {
+  it('is the exact same figure as calculateStudentGPM (an alias, not a re-implementation)', () => {
+    const results = [makeResult('s1', 'math', 'B+'), makeResult('s1', 'bm', 'C')];
+    expect(calculateGPI(results)).toBe(calculateStudentGPM(results));
+  });
+});
+
+describe('isExcellentStudent', () => {
+  it('is true only when every result is A- (gp <= 3) or better', () => {
+    expect(isExcellentStudent([makeResult('s1', 'math', 'A+'), makeResult('s1', 'bm', 'A-')])).toBe(true);
+  });
+
+  it('is false if even one subject falls below A-', () => {
+    expect(isExcellentStudent([makeResult('s1', 'math', 'A+'), makeResult('s1', 'bm', 'B+')])).toBe(false);
+  });
+
+  it('is false for a student with no results', () => {
+    expect(isExcellentStudent([])).toBe(false);
   });
 });

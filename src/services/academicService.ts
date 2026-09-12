@@ -3,10 +3,13 @@ import { calculateGPMP, calculateGPS, calculateGradeDistribution, calculatePassR
 import { loadCoreDataset } from './dataset';
 import { buildRiskLookup } from './riskLookup';
 import { getDataProvider } from '../providers';
+import type { AcademicResult } from '../types/schema';
 
 export interface AcademicOverview {
   gpsCurrent: number;
   gpsTarget: number;
+  /** currentGPS - targetGPS (positive = above target = improvement required, since lower GPS is better). */
+  gpsGap: number;
   gpmpCurrent: number;
   gpmpTarget: number;
   passRate: number;
@@ -58,9 +61,12 @@ export async function getAcademicOverview(): Promise<AcademicOverview> {
     };
   });
 
+  const gpsTarget = gpsTargetRow?.target_value ?? 4.84;
+
   return {
     gpsCurrent,
-    gpsTarget: gpsTargetRow?.target_value ?? 4.84,
+    gpsTarget,
+    gpsGap: Math.round((gpsCurrent - gpsTarget) * 100) / 100,
     gpmpCurrent: calculateGPMP(dataset.latestResults, 'sub-mat'),
     gpmpTarget: gpmpTargetRow?.target_value ?? 5.0,
     passRate: calculatePassRate(dataset.latestResults),
@@ -70,4 +76,29 @@ export async function getAcademicOverview(): Promise<AcademicOverview> {
     classPerformance,
     gpsTrend,
   };
+}
+
+// --- Granular result accessors ---------------------------------------
+// Thin wrappers over DataProvider.getAcademicResults(), which already
+// supports these filters — kept here so pages/hooks never call the
+// provider directly (see docs/architecture.md).
+
+export async function getResults(): Promise<AcademicResult[]> {
+  return getDataProvider().getAcademicResults();
+}
+
+export async function getStudentResults(studentId: string): Promise<AcademicResult[]> {
+  return getDataProvider().getAcademicResults({ studentId });
+}
+
+export async function getSubjectResults(subjectId: string): Promise<AcademicResult[]> {
+  return getDataProvider().getAcademicResults({ subjectId });
+}
+
+export async function getClassResults(classId: string): Promise<AcademicResult[]> {
+  return getDataProvider().getAcademicResults({ classId });
+}
+
+export async function getAssessmentResults(assessmentId: string): Promise<AcademicResult[]> {
+  return getDataProvider().getAcademicResults({ assessmentId });
 }

@@ -1,5 +1,6 @@
 import type { Student } from '../types';
 import { calculateStudentGPM } from '../engines/academicEngine';
+import { calculateAttendanceRate } from '../engines/attendanceEngine';
 import type { StudentRiskAssessment } from '../engines/riskEngine';
 import { classifyStemPipeline } from '../engines/stemEngine';
 import { loadCoreDataset, type CoreDataset } from './dataset';
@@ -25,9 +26,8 @@ function buildStudentView(dataset: CoreDataset, risk: StudentRiskAssessment, stu
 
   const gpm = calculateStudentGPM(latestResults);
   const academicScore = average(latestResults.map((r) => r.percentage));
-  const attendanceRate = attendanceRecords.length
-    ? Math.round((attendanceRecords.filter((a) => a.status === 'PRESENT' || a.status === 'LATE').length / attendanceRecords.length) * 100)
-    : 100;
+  // Single source of truth for "attended" — see attendanceEngine.calculateAttendanceRate.
+  const attendanceRate = attendanceRecords.length ? calculateAttendanceRate(attendanceRecords) : 100;
 
   const mathGrade = latestResults.find((r) => r.subject_id === 'sub-mat' || r.subject_id === 'sub-mt')?.grade;
   const scienceGrade = latestResults.find((r) => ['sub-sains', 'sub-fiz', 'sub-kim', 'sub-bio'].includes(r.subject_id))?.grade;
@@ -93,4 +93,41 @@ export async function getStudentProfile(studentId: string): Promise<Student | nu
 export async function listClassNames(): Promise<string[]> {
   const dataset = await loadCoreDataset();
   return dataset.classes.map((c) => c.name);
+}
+
+// --- Named convenience accessors ------------------------------------
+// Thin wrappers over listStudents()/getStudentProfile() — kept here
+// rather than duplicating the filtering/lookup logic, so there is still
+// exactly one place a Student view is assembled (buildStudentView above).
+
+/** All students, optionally filtered — alias of listStudents() for API-naming parity. */
+export async function getStudents(filters: StudentListFilters = {}): Promise<Student[]> {
+  return listStudents(filters);
+}
+
+/** A single student by id, or null if it doesn't exist. Alias of getStudentProfile(). */
+export async function getStudentById(studentId: string): Promise<Student | null> {
+  return getStudentProfile(studentId);
+}
+
+export async function getStudentsByForm(form: Student['form']): Promise<Student[]> {
+  return listStudents({ form });
+}
+
+export async function getStudentsByClass(className: string): Promise<Student[]> {
+  return listStudents({ className });
+}
+
+export async function searchStudents(query: string): Promise<Student[]> {
+  return listStudents({ search: query });
+}
+
+export async function getStudentsByRisk(riskLevel: Student['riskLevel']): Promise<Student[]> {
+  return listStudents({ riskLevel });
+}
+
+/** Top N students by GPM (lowest/best first), optionally scoped to one form. */
+export async function getTopStudents(count = 10, form?: Student['form']): Promise<Student[]> {
+  const students = await listStudents(form ? { form } : {});
+  return [...students].sort((a, b) => a.gpm - b.gpm).slice(0, count);
 }

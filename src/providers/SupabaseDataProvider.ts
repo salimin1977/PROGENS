@@ -10,6 +10,8 @@ import type {
   AttendanceFilter,
   DataProvider,
   InterventionFilter,
+  NewInterventionInput,
+  UpdateInterventionInput,
 } from './DataProvider';
 import { DataProviderError } from './DataProvider';
 import type {
@@ -129,6 +131,38 @@ export class SupabaseDataProvider implements DataProvider {
       this.client.from('intervention_actions').select('*').eq('intervention_id', interventionId).order('action_date'),
       'intervention_actions'
     );
+  }
+
+  async createIntervention(input: NewInterventionInput): Promise<DbIntervention> {
+    const row = await unwrap<DbIntervention[]>(
+      this.client
+        .from('interventions')
+        .insert({ ...input, status: input.status ?? 'PLANNED', outcome: null })
+        .select(),
+      'interventions (create)'
+    );
+    return row[0];
+  }
+
+  async updateIntervention(id: string, patch: UpdateInterventionInput): Promise<DbIntervention> {
+    const row = await unwrap<DbIntervention[]>(
+      this.client.from('interventions').update(patch).eq('id', id).select(),
+      'interventions (update)'
+    );
+    if (!row[0]) throw new DataProviderError(`Intervention "${id}" does not exist`);
+    return row[0];
+  }
+
+  async closeIntervention(id: string, outcome: string): Promise<DbIntervention> {
+    return this.updateIntervention(id, { status: 'CLOSED', outcome });
+  }
+
+  async addInterventionAction(action: Omit<InterventionAction, 'id'>): Promise<InterventionAction> {
+    const row = await unwrap<InterventionAction[]>(
+      this.client.from('intervention_actions').insert(action).select(),
+      'intervention_actions (create)'
+    );
+    return row[0];
   }
 
   async getKpiTargets(): Promise<Omit<KpiTargetRow, 'status'>[]> {

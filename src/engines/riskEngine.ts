@@ -27,7 +27,17 @@ export interface StudentRiskAssessment {
   trendDelta: number;
 }
 
+/** Alias — the shape callers elsewhere in PROGENS refer to as "RiskProfile". */
+export type RiskProfile = StudentRiskAssessment;
+
 const SIGNIFICANT_DECLINE_POINTS = 1.5;
+
+/**
+ * The fixed G-grade-count thresholds the base risk rule uses. Exported so
+ * Settings can display the actual rule PROGENS enforces instead of a
+ * disconnected, independently-editable copy of these numbers.
+ */
+export const RISK_G_COUNT_THRESHOLDS = { CRITICAL: 4, HIGH: 2, MEDIUM: 1 } as const;
 
 function subjectName(subjects: Subject[] | undefined, subjectId: string): string {
   return subjects?.find((s) => s.id === subjectId)?.name ?? subjectId;
@@ -61,9 +71,9 @@ export function calculateStudentRisk(input: CalculateStudentRiskInput): StudentR
   const trendDelta = Math.round((latestGpm - previousGpm) * 100) / 100; // positive = got worse (higher GP)
 
   let riskLevel: RiskLevelDb;
-  if (gCount >= 4) riskLevel = 'CRITICAL';
-  else if (gCount >= 2) riskLevel = 'HIGH';
-  else if (gCount === 1) riskLevel = 'MEDIUM';
+  if (gCount >= RISK_G_COUNT_THRESHOLDS.CRITICAL) riskLevel = 'CRITICAL';
+  else if (gCount >= RISK_G_COUNT_THRESHOLDS.HIGH) riskLevel = 'HIGH';
+  else if (gCount === RISK_G_COUNT_THRESHOLDS.MEDIUM) riskLevel = 'MEDIUM';
   else riskLevel = isAttendanceFlagged(attendanceRate) || trendDelta >= SIGNIFICANT_DECLINE_POINTS ? 'MEDIUM' : 'LOW';
 
   let score = Math.min(80, gCount * 20);
