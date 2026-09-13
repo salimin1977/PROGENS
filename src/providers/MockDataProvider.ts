@@ -20,6 +20,9 @@ const attendance: AttendanceRecord[] = students.map((student) => ({
   studentId: student.id,
   date: '2026-08-31',
   rate: student.attendanceRate,
+  absentDays: 0,
+  academicYear: 2026,
+  sourceLabel: 'Mock Dataset',
 }));
 
 export class MockDataProvider implements DataProvider {
