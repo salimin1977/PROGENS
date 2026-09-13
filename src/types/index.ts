@@ -1,6 +1,6 @@
 export type Form = 'Tingkatan 1' | 'Tingkatan 2' | 'Tingkatan 3' | 'Tingkatan 4' | 'Tingkatan 5';
-export type RiskLevel = 'Critical' | 'High' | 'Moderate' | 'Low';
-export type StudentStatus = 'Active' | 'On Watch' | 'Excellence Track';
+export type RiskLevel = 'Critical' | 'High' | 'Moderate' | 'Low' | 'Unassessed';
+export type StudentStatus = 'Active' | 'On Watch' | 'Excellence Track' | 'Unassessed';
 export type Gender = 'Male' | 'Female';
 export type AssessmentType = 'TOV' | 'PPT' | 'PPSA' | 'PASA' | 'SPM' | 'ETR';
 
