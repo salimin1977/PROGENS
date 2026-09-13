@@ -1,157 +1,29 @@
 import { Users, GraduationCap, CalendarCheck, ShieldAlert, LifeBuoy, FlaskConical } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar } from 'recharts';
-import KPICard from '../components/ui/KPICard';
-import ChartCard from '../components/ui/ChartCard';
-import ProgressBar from '../components/ui/ProgressBar';
-import InsightCard from '../components/ui/InsightCard';
-import { commandKpis, strategicOverview, aiInsights } from '../data/kpi';
-import { academicKpi, gpsTrend } from '../data/academic';
-import { students } from '../data/students';
-import { interventionSummary } from '../data/interventions';
-import { Link } from 'react-router-dom';
-
-const RISK_COLORS: Record<string, string> = {
-  Critical: '#e11d48',
-  High: '#fb7185',
-  Moderate: '#d6931f',
-  Low: '#22a89b',
-};
-
+import KPICard from '../components/ui/KPICard'; import ChartCard from '../components/ui/ChartCard'; import ProgressBar from '../components/ui/ProgressBar'; import InsightCard from '../components/ui/InsightCard';
+import { commandKpis, strategicOverview, aiInsights } from '../data/kpi'; import { academicKpi, gpsTrend } from '../data/academic'; import { interventions } from '../data/interventions';
+import { useKPIs } from '../hooks/useKPIs'; import { useStudents } from '../hooks/useStudents'; import { Link } from 'react-router-dom';
+const RISK_COLORS: Record<string,string> = { Critical:'#e11d48', High:'#fb7185', Moderate:'#d6931f', Low:'#22a89b' };
 export default function Command() {
-  const riskData = ['Critical', 'High', 'Moderate', 'Low'].map((level) => ({
-    name: level,
-    value: students.filter((s) => s.riskLevel === level).length,
-  }));
-
-  const interventionData = [
-    { name: 'Not Started', value: interventionSummary.notStarted },
-    { name: 'Active', value: interventionSummary.active },
-    { name: 'Completed', value: interventionSummary.completed },
-    { name: 'Monitoring', value: interventionSummary.monitoring },
-  ];
-
-  const gpsImproving = academicKpi.gpsCurrent <= 5.11 && academicKpi.gpsCurrent > academicKpi.gpsTarget;
-
-  return (
-    <div className="space-y-6">
-      <section>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <KPICard label="Total Students" value={commandKpis.totalStudents.toString()} icon={Users} tone="neutral" helperText="Across Tingkatan 1-5" />
-          <KPICard label="Academic Performance" value={`${commandKpis.academicPerformance}%`} icon={GraduationCap} tone="positive" trend={{ direction: 'up', text: 'Pass rate' }} />
-          <KPICard label="Attendance" value={`${commandKpis.attendance.toFixed(1)}%`} icon={CalendarCheck} tone="positive" helperText="School average" />
-          <KPICard label="Students at Risk" value={commandKpis.studentsAtRisk.toString()} icon={ShieldAlert} tone="critical" helperText="Critical + High" />
-          <KPICard label="Intervention Active" value={commandKpis.interventionActive.toString()} icon={LifeBuoy} tone="warning" helperText="Cases in progress" />
-          <KPICard label="STEM Pipeline" value={commandKpis.stemPipeline.toString()} icon={FlaskConical} tone="positive" helperText="Identified candidates" />
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <ChartCard title="Student Progress" description="School-wide progress index" className="lg:col-span-1">
-          <div className="space-y-4">
-            <ProgressOverview label="Overall Progress" value={strategicOverview.overallProgress} tone="navy" />
-            <ProgressOverview label="Academic" value={strategicOverview.academic} tone="teal" />
-            <ProgressOverview label="Attendance" value={strategicOverview.attendance} tone="teal" />
-            <ProgressOverview label="Intervention" value={strategicOverview.intervention} tone="gold" />
-            <ProgressOverview label="Talent" value={strategicOverview.talent} tone="gold" />
-          </div>
-        </ChartCard>
-
-        <ChartCard title="School Performance" description="Grade Purata Sekolah trajectory" className="lg:col-span-2">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Metric label="GPS Current" value={academicKpi.gpsCurrent.toFixed(2)} />
-            <Metric label="GPS Target" value={academicKpi.gpsTarget.toFixed(2)} />
-            <Metric label="Pass Rate" value={`${academicKpi.passRate}%`} />
-            <Metric label="Students At Risk" value={commandKpis.studentsAtRisk.toString()} />
-          </div>
-          <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm">
-            <span className="font-semibold text-navy-900">Status: </span>
-            <span className={gpsImproving ? 'text-gold-700 font-semibold' : 'text-rose-700 font-semibold'}>
-              {gpsImproving ? 'Improvement Required' : 'On Track'}
-            </span>
-            <span className="ml-2 text-slate-500">GPS must decrease from {academicKpi.gpsCurrent.toFixed(2)} to {academicKpi.gpsTarget.toFixed(2)} (lower is better).</span>
-          </div>
-          <div className="mt-4 h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={gpsTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                <YAxis domain={[4.5, 6]} reversed tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="gps" name="GPS" stroke="#166b66" strokeWidth={2.5} dot={{ r: 4 }} />
-                <Line type="monotone" dataKey="target" name="Target" stroke="#d6931f" strokeDasharray="5 5" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
-      </section>
-
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ChartCard title="Risk Distribution" description="Students by risk category">
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={riskData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2}>
-                  {riskData.map((entry) => (
-                    <Cell key={entry.name} fill={RISK_COLORS[entry.name]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
-
-        <ChartCard title="Intervention Status" description="Case pipeline overview">
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={interventionData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#17877e" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
-      </section>
-
-      <section>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-bold uppercase tracking-wide text-navy-900">Leadership Signal — What Requires Action</h3>
-          <Link to="/nexus" className="whitespace-nowrap text-xs font-semibold text-teal-700 hover:underline">
-            View all insights in NEXUS &rarr;
-          </Link>
-        </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {aiInsights.map((insight) => (
-            <InsightCard key={insight.id} insight={insight} />
-          ))}
-        </div>
-      </section>
-    </div>
-  );
+  const { data: kpi, loading: kpiLoading } = useKPIs(); const { data: students } = useStudents();
+  const riskData = ['Critical','High','Moderate','Low'].map((level)=>({name:level,value:students.filter((s)=>s.riskLevel===level).length}));
+  const interventionData = ['Not Started','Active','Completed','Monitoring'].map((name)=>({name,value:interventions.filter((i)=>i.status===name).length}));
+  const gpsCurrent = kpi?.gpsCurrent ?? academicKpi.gpsCurrent; const gpsTarget = kpi?.gpsTarget ?? academicKpi.gpsTarget; const gpsGap = kpi?.gpsGap ?? (gpsCurrent-gpsTarget);
+  const gpsImproving = gpsCurrent > gpsTarget;
+  return <div className="space-y-6">
+    <section><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <KPICard label="Total Students" value={kpiLoading?'—':String(kpi?.totalStudents ?? 0)} icon={Users} tone="neutral" helperText="Across Tingkatan 1-5" />
+      <KPICard label="Academic Performance" value={kpiLoading?'—':`${commandKpis.academicPerformance}%`} icon={GraduationCap} tone="positive" trend={{direction:'up',text:'Pass rate'}} />
+      <KPICard label="Attendance" value={kpiLoading?'—':`${kpi?.attendance.toFixed(1)}%`} icon={CalendarCheck} tone="positive" helperText="School average" />
+      <KPICard label="Students at Risk" value={kpiLoading?'—':String(kpi?.studentsAtRisk ?? 0)} icon={ShieldAlert} tone="critical" helperText="Critical + High" />
+      <KPICard label="Intervention Active" value={kpiLoading?'—':String(kpi?.activeInterventions ?? 0)} icon={LifeBuoy} tone="warning" helperText="Cases in progress" />
+      <KPICard label="Murid Cemerlang" value={kpiLoading?'—':String(kpi?.excellenceStudents ?? 0)} icon={FlaskConical} tone="positive" helperText="Excellence Track" />
+    </div></section>
+    <section className="grid grid-cols-1 gap-4 lg:grid-cols-3"><ChartCard title="Student Progress" description="School-wide progress index" className="lg:col-span-1"><div className="space-y-4"><ProgressOverview label="Overall Progress" value={strategicOverview.overallProgress} tone="navy"/><ProgressOverview label="Academic" value={strategicOverview.academic} tone="teal"/><ProgressOverview label="Attendance" value={strategicOverview.attendance} tone="teal"/><ProgressOverview label="Intervention" value={strategicOverview.intervention} tone="gold"/><ProgressOverview label="Talent" value={strategicOverview.talent} tone="gold"/></div></ChartCard>
+    <ChartCard title="School Performance" description="Grade Purata Sekolah trajectory" className="lg:col-span-2"><div className="grid grid-cols-2 gap-4 sm:grid-cols-4"><Metric label="GPS Semasa" value={gpsCurrent.toFixed(2)}/><Metric label="GPS Sasaran" value={gpsTarget.toFixed(2)}/><Metric label="Jurang" value={gpsGap.toFixed(2)}/><Metric label="Murid Berisiko" value={String(kpi?.studentsAtRisk ?? commandKpis.studentsAtRisk)}/></div><div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm"><span className="font-semibold text-navy-900">Status: </span><span className={gpsImproving?'text-gold-700 font-semibold':'text-rose-700 font-semibold'}>{gpsImproving?'Improvement Required':'On Track'}</span><span className="ml-2 text-slate-500">GPS {gpsCurrent.toFixed(2)} → {gpsTarget.toFixed(2)} (lower is better).</span></div><div className="mt-4 h-48"><ResponsiveContainer width="100%" height="100%"><LineChart data={gpsTrend}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0"/><XAxis dataKey="year" tick={{fontSize:12}} stroke="#94a3b8"/><YAxis domain={[4.5,6]} reversed tick={{fontSize:12}} stroke="#94a3b8"/><Tooltip/><Legend/><Line type="monotone" dataKey="gps" name="GPS" stroke="#166b66" strokeWidth={2.5}/><Line type="monotone" dataKey="target" name="Target" stroke="#d6931f" strokeDasharray="5 5" strokeWidth={2}/></LineChart></ResponsiveContainer></div></ChartCard></section>
+    <section className="grid grid-cols-1 gap-4 lg:grid-cols-2"><ChartCard title="Risk Distribution" description="Students by risk category"><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={riskData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2}>{riskData.map((entry)=><Cell key={entry.name} fill={RISK_COLORS[entry.name]}/>)}</Pie><Tooltip/><Legend/></PieChart></ResponsiveContainer></div></ChartCard><ChartCard title="Intervention Status" description="Case pipeline overview"><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={interventionData}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0"/><XAxis dataKey="name" tick={{fontSize:11}}/><YAxis allowDecimals={false}/><Tooltip/><Bar dataKey="value" fill="#17877e"/></BarChart></ResponsiveContainer></div></ChartCard></section>
+    <section><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold uppercase tracking-wide text-navy-900">Leadership Signal — What Requires Action</h3><Link to="/nexus" className="text-xs font-semibold text-teal-700 hover:underline">View all insights in NEXUS →</Link></div><div className="grid grid-cols-1 gap-4 lg:grid-cols-3">{aiInsights.map((insight)=><InsightCard key={insight.id} insight={insight}/>)}</div></section>
+  </div>;
 }
-
-function ProgressOverview({ label, value, tone }: { label: string; value: number; tone: 'teal' | 'gold' | 'navy' }) {
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-sm">
-        <span className="font-medium text-navy-800">{label}</span>
-        <span className="font-bold text-navy-950">{value}%</span>
-      </div>
-      <ProgressBar value={value} tone={tone} />
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-slate-50 px-3 py-2">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-lg font-extrabold text-navy-950">{value}</p>
-    </div>
-  );
-}
+function ProgressOverview({label,value,tone}:{label:string;value:number;tone:'teal'|'gold'|'navy'}){return <div><div className="mb-1 flex items-center justify-between text-sm"><span>{label}</span><span className="font-bold">{value}%</span></div><ProgressBar value={value} tone={tone}/></div>}
+function Metric({label,value}:{label:string;value:string}){return <div className="rounded-lg bg-slate-50 px-3 py-2"><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 text-lg font-extrabold text-navy-950">{value}</p></div>}
