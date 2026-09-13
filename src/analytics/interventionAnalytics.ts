@@ -4,9 +4,9 @@ export type InterventionRecommendation = 'ACADEMIC_RESCUE' | 'SUBJECT_COACHING' 
 
 export function generateInterventionRecommendation(student: Student): InterventionRecommendation {
   const gCount = student.subjects.filter((s) => s.grade === 'G').length;
-  if (student.attendanceRate < 90) return 'ATTENDANCE_INTERVENTION';
   if (gCount >= 4) return 'ACADEMIC_RESCUE';
   if (student.subjects.some((s) => /math/i.test(s.subject) && s.score < 40)) return 'STEM_RESCUE';
+  if (student.attendanceRate < 90) return 'ATTENDANCE_INTERVENTION';
   if (student.subjects.some((s) => s.score < 40)) return 'SUBJECT_COACHING';
   if (student.academicScore < 60) return 'MENTORING';
   if (student.stemTrack) return 'PEER_SUPPORT';
