@@ -9,12 +9,13 @@ export interface DashboardKPIs {
   totalStudents: number;
   studentsAtRisk: number;
   activeInterventions: number;
-  attendance: number;
+  attendance: number | null;
   excellenceStudents: number;
 }
 
 const toDashboardKPIs = (items: KPI[]): DashboardKPIs => {
   const value = (id: string, fallback = 0): number => items.find((item) => item.id === id)?.current ?? fallback;
+  const attendance = items.find((item) => item.id === 'ATTENDANCE')?.current;
 
   return {
     gpsCurrent: value('GPS_CURRENT', 5.11),
@@ -23,7 +24,7 @@ const toDashboardKPIs = (items: KPI[]): DashboardKPIs => {
     totalStudents: value('TOTAL_STUDENTS'),
     studentsAtRisk: value('STUDENTS_AT_RISK'),
     activeInterventions: value('ACTIVE_INTERVENTIONS'),
-    attendance: value('ATTENDANCE'),
+    attendance: typeof attendance === 'number' ? attendance : null,
     excellenceStudents: value('EXCELLENCE_STUDENTS'),
   };
 };
@@ -38,6 +39,9 @@ export function useKPIs() {
     getSchoolKPIs()
       .then((items) => {
         if (active) setData(toDashboardKPIs(items));
+      })
+      .catch(() => {
+        if (active) setData(null);
       })
       .finally(() => {
         if (active) setLoading(false);
