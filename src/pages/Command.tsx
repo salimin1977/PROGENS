@@ -1,29 +1,121 @@
-import { Users, GraduationCap, CalendarCheck, ShieldAlert, LifeBuoy, FlaskConical } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar } from 'recharts';
-import KPICard from '../components/ui/KPICard'; import ChartCard from '../components/ui/ChartCard'; import ProgressBar from '../components/ui/ProgressBar'; import InsightCard from '../components/ui/InsightCard';
-import { commandKpis, strategicOverview, aiInsights } from '../data/kpi'; import { academicKpi, gpsTrend } from '../data/academic'; import { interventions } from '../data/interventions';
-import { useKPIs } from '../hooks/useKPIs'; import { useStudents } from '../hooks/useStudents'; import { Link } from 'react-router-dom';
-const RISK_COLORS: Record<string,string> = { Critical:'#e11d48', High:'#fb7185', Moderate:'#d6931f', Low:'#22a89b' };
+import { useEffect, useMemo, useState } from 'react';
+import { Users, GraduationCap, CalendarCheck, ShieldAlert, LifeBuoy, Target, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import KPICard from '../components/ui/KPICard';
+import ChartCard from '../components/ui/ChartCard';
+import ProgressBar from '../components/ui/ProgressBar';
+import { getConfiguredProvider } from '../providers';
+import type { AttendanceRecord, Intervention, Student } from '../types';
+import { useKPIs } from '../hooks/useKPIs';
+
+const provider = () => getConfiguredProvider();
+const RISK_WEIGHT: Record<string, number> = { Critical: 40, High: 30, Moderate: 15, Low: 0, Unassessed: 20 };
+
+interface CommandItem {
+  student: Student;
+  absentDays: number;
+  score: number;
+  reason: string;
+  action: string;
+}
+
 export default function Command() {
-  const { data: kpi, loading: kpiLoading } = useKPIs(); const { data: students } = useStudents();
-  const riskData = ['Critical','High','Moderate','Low'].map((level)=>({name:level,value:students.filter((s)=>s.riskLevel===level).length}));
-  const interventionData = ['Not Started','Active','Completed','Monitoring'].map((name)=>({name,value:interventions.filter((i)=>i.status===name).length}));
-  const gpsCurrent = kpi?.gpsCurrent ?? academicKpi.gpsCurrent; const gpsTarget = kpi?.gpsTarget ?? academicKpi.gpsTarget; const gpsGap = kpi?.gpsGap ?? (gpsCurrent-gpsTarget);
-  const gpsImproving = gpsCurrent > gpsTarget;
+  const { data: kpi, loading: kpiLoading } = useKPIs();
+  const [students, setStudents] = useState<Student[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [interventions, setInterventions] = useState<Intervention[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([provider().getStudents(), provider().getAttendance(), provider().getInterventions()])
+      .then(([studentRows, attendanceRows, interventionRows]) => {
+        if (!active) return;
+        setStudents(studentRows);
+        setAttendance(attendanceRows);
+        setInterventions(interventionRows);
+      })
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, []);
+
+  const absenceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    attendance.forEach((row) => map.set(row.studentId, row.absentDays ?? 0));
+    return map;
+  }, [attendance]);
+
+  const interventionStudentIds = useMemo(() => new Set(
+    interventions.filter((item) => item.status === 'Active' || item.status === 'Critical' || item.status === 'Monitoring').map((item) => item.studentId),
+  ), [interventions]);
+
+  const priorityQueue = useMemo<CommandItem[]>(() => students
+    .map((student) => {
+      const absentDays = absenceMap.get(student.id) ?? 0;
+      const academicPenalty = student.academicScore <= 50 ? 20 : student.academicScore <= 65 ? 10 : 0;
+      const absencePenalty = absentDays >= 20 ? 25 : absentDays >= 10 ? 15 : absentDays >= 5 ? 8 : 0;
+      const interventionGap = !interventionStudentIds.has(student.id) && (student.riskLevel === 'Critical' || student.riskLevel === 'High') ? 10 : 0;
+      const score = RISK_WEIGHT[student.riskLevel] + academicPenalty + absencePenalty + interventionGap;
+      const reasons = [
+        student.riskLevel !== 'Low' && student.riskLevel !== 'Unassessed' ? `Risiko ${student.riskLevel}` : '',
+        absentDays >= 10 ? `${absentDays} hari tidak hadir` : '',
+        student.academicScore <= 65 ? `Prestasi ${student.academicScore.toFixed(0)}%` : '',
+        interventionGap > 0 ? 'Tiada intervensi aktif' : '',
+      ].filter(Boolean);
+      const action = interventionGap > 0 ? 'Buka intervensi' : absentDays >= 10 ? 'Semak kehadiran & punca' : 'Semak kemajuan';
+      return { student, absentDays, score, reason: reasons.join(' • ') || 'Perlu semakan data', action };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8),
+  [students, absenceMap, interventionStudentIds]);
+
+  const coverage = students.length ? Math.round((students.filter((s) => s.riskLevel !== 'Unassessed').length / students.length) * 100) : 0;
+  const criticalHigh = students.filter((s) => s.riskLevel === 'Critical' || s.riskLevel === 'High').length;
+  const unassessed = students.filter((s) => s.riskLevel === 'Unassessed').length;
+  const activeInterventions = interventions.filter((i) => i.status === 'Active' || i.status === 'Critical').length;
+  const commandStatus = criticalHigh > activeInterventions ? 'ACTION REQUIRED' : unassessed > 0 ? 'DATA COVERAGE GAP' : 'MONITOR';
+
   return <div className="space-y-6">
-    <section><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-      <KPICard label="Total Students" value={kpiLoading?'—':String(kpi?.totalStudents ?? 0)} icon={Users} tone="neutral" helperText="Across Tingkatan 1-5" />
-      <KPICard label="Academic Performance" value={kpiLoading?'—':`${commandKpis.academicPerformance}%`} icon={GraduationCap} tone="positive" trend={{direction:'up',text:'Pass rate'}} />
-      <KPICard label="Attendance" value={kpiLoading?'—':`${kpi?.attendance.toFixed(1)}%`} icon={CalendarCheck} tone="positive" helperText="School average" />
-      <KPICard label="Students at Risk" value={kpiLoading?'—':String(kpi?.studentsAtRisk ?? 0)} icon={ShieldAlert} tone="critical" helperText="Critical + High" />
-      <KPICard label="Intervention Active" value={kpiLoading?'—':String(kpi?.activeInterventions ?? 0)} icon={LifeBuoy} tone="warning" helperText="Cases in progress" />
-      <KPICard label="Murid Cemerlang" value={kpiLoading?'—':String(kpi?.excellenceStudents ?? 0)} icon={FlaskConical} tone="positive" helperText="Excellence Track" />
-    </div></section>
-    <section className="grid grid-cols-1 gap-4 lg:grid-cols-3"><ChartCard title="Student Progress" description="School-wide progress index" className="lg:col-span-1"><div className="space-y-4"><ProgressOverview label="Overall Progress" value={strategicOverview.overallProgress} tone="navy"/><ProgressOverview label="Academic" value={strategicOverview.academic} tone="teal"/><ProgressOverview label="Attendance" value={strategicOverview.attendance} tone="teal"/><ProgressOverview label="Intervention" value={strategicOverview.intervention} tone="gold"/><ProgressOverview label="Talent" value={strategicOverview.talent} tone="gold"/></div></ChartCard>
-    <ChartCard title="School Performance" description="Grade Purata Sekolah trajectory" className="lg:col-span-2"><div className="grid grid-cols-2 gap-4 sm:grid-cols-4"><Metric label="GPS Semasa" value={gpsCurrent.toFixed(2)}/><Metric label="GPS Sasaran" value={gpsTarget.toFixed(2)}/><Metric label="Jurang" value={gpsGap.toFixed(2)}/><Metric label="Murid Berisiko" value={String(kpi?.studentsAtRisk ?? commandKpis.studentsAtRisk)}/></div><div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm"><span className="font-semibold text-navy-900">Status: </span><span className={gpsImproving?'text-gold-700 font-semibold':'text-rose-700 font-semibold'}>{gpsImproving?'Improvement Required':'On Track'}</span><span className="ml-2 text-slate-500">GPS {gpsCurrent.toFixed(2)} → {gpsTarget.toFixed(2)} (lower is better).</span></div><div className="mt-4 h-48"><ResponsiveContainer width="100%" height="100%"><LineChart data={gpsTrend}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0"/><XAxis dataKey="year" tick={{fontSize:12}} stroke="#94a3b8"/><YAxis domain={[4.5,6]} reversed tick={{fontSize:12}} stroke="#94a3b8"/><Tooltip/><Legend/><Line type="monotone" dataKey="gps" name="GPS" stroke="#166b66" strokeWidth={2.5}/><Line type="monotone" dataKey="target" name="Target" stroke="#d6931f" strokeDasharray="5 5" strokeWidth={2}/></LineChart></ResponsiveContainer></div></ChartCard></section>
-    <section className="grid grid-cols-1 gap-4 lg:grid-cols-2"><ChartCard title="Risk Distribution" description="Students by risk category"><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={riskData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2}>{riskData.map((entry)=><Cell key={entry.name} fill={RISK_COLORS[entry.name]}/>)}</Pie><Tooltip/><Legend/></PieChart></ResponsiveContainer></div></ChartCard><ChartCard title="Intervention Status" description="Case pipeline overview"><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={interventionData}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0"/><XAxis dataKey="name" tick={{fontSize:11}}/><YAxis allowDecimals={false}/><Tooltip/><Bar dataKey="value" fill="#17877e"/></BarChart></ResponsiveContainer></div></ChartCard></section>
-    <section><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold uppercase tracking-wide text-navy-900">Leadership Signal — What Requires Action</h3><Link to="/nexus" className="text-xs font-semibold text-teal-700 hover:underline">View all insights in NEXUS →</Link></div><div className="grid grid-cols-1 gap-4 lg:grid-cols-3">{aiInsights.map((insight)=><InsightCard key={insight.id} insight={insight}/>)}</div></section>
+    <section>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">Fasa 4 • Command Centre</p><h2 className="mt-1 text-2xl font-extrabold text-navy-950">Apa yang perlu tindakan dahulu?</h2></div>
+        <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${commandStatus === 'ACTION REQUIRED' ? 'bg-rose-100 text-rose-700' : commandStatus === 'DATA COVERAGE GAP' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{commandStatus}</span>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <KPICard label="Total Students" value={kpiLoading ? '—' : String(kpi?.totalStudents ?? students.length)} icon={Users} tone="neutral" helperText="Live Supabase" />
+        <KPICard label="Critical + High" value={loading ? '—' : String(criticalHigh)} icon={ShieldAlert} tone="critical" helperText="Priority queue" />
+        <KPICard label="Intervention Active" value={loading ? '—' : String(activeInterventions)} icon={LifeBuoy} tone="warning" helperText="Critical + Active" />
+        <KPICard label="Data Coverage" value={loading ? '—' : `${coverage}%`} icon={Target} tone={coverage === 100 ? 'positive' : 'warning'} helperText={`${unassessed} belum dinilai`} />
+        <KPICard label="Attendance Source" value={loading ? '—' : `${attendance.length}`} icon={CalendarCheck} tone="neutral" helperText="Aggregate records" />
+      </div>
+    </section>
+
+    <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <ChartCard title="Decision Stack" description="KPI → bottleneck → risk → action" className="lg:col-span-1">
+        <div className="space-y-4">
+          <ProgressOverview label="Risk Coverage" value={coverage} tone="teal" />
+          <Signal label="Critical + High" value={criticalHigh} detail={criticalHigh > activeInterventions ? 'Intervention gap exists' : 'Covered by active cases'} critical={criticalHigh > activeInterventions} />
+          <Signal label="Unassessed" value={unassessed} detail={unassessed ? 'Data diagnosis belum lengkap' : 'Coverage lengkap'} critical={unassessed > 0} />
+          <Signal label="Priority Queue" value={priorityQueue.length} detail="Students requiring review" critical={priorityQueue.length > 0} />
+        </div>
+      </ChartCard>
+
+      <ChartCard title="Priority Action Queue" description="Susunan tindakan berdasarkan signal semasa" className="lg:col-span-2">
+        {loading ? <p className="py-12 text-center text-sm text-slate-500">Memuatkan data live…</p> : priorityQueue.length === 0 ? <p className="py-12 text-center text-sm text-slate-500">Tiada signal tindakan aktif daripada data semasa.</p> : <div className="space-y-2">{priorityQueue.map((item, index) => <div key={item.student.id} className="flex items-center gap-3 rounded-xl border border-slate-200 p-3"><span className="w-6 text-center text-xs font-extrabold text-slate-400">{index + 1}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="truncate font-bold text-navy-950">{item.student.name}</span><span className="text-xs text-slate-500">{item.student.className}</span></div><p className="mt-0.5 text-xs text-slate-500">{item.reason}</p></div><div className="hidden text-right sm:block"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Priority</p><p className="font-extrabold text-navy-950">{item.score}</p></div><Link to={`/students/${item.student.id}`} className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-2 text-xs font-bold text-teal-700 hover:bg-slate-200">{item.action}<ArrowRight size={14}/></Link></div>)}</div>}
+      </ChartCard>
+    </section>
+
+    <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <CommandQuestion title="1. Siapa paling perlu tindakan?" text={priorityQueue[0] ? `${priorityQueue[0].student.name} — ${priorityQueue[0].reason}` : 'Tiada calon dalam queue.'} />
+      <CommandQuestion title="2. Adakah intervensi mencukupi?" text={`${activeInterventions} kes aktif untuk ${criticalHigh} murid Critical + High.`} warning={criticalHigh > activeInterventions} />
+      <CommandQuestion title="3. Adakah data cukup untuk membuat keputusan?" text={unassessed ? `${unassessed} murid masih Unassessed.` : 'Coverage risiko lengkap untuk murid aktif.'} warning={unassessed > 0} />
+    </section>
+
+    <section className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex items-start gap-3"><GraduationCap className="mt-0.5 text-teal-700" size={20}/><div><p className="font-bold text-navy-950">Prinsip Command Centre</p><p className="mt-1 text-sm text-slate-600">Dashboard ini sengaja bergerak daripada paparan KPI kepada keputusan: <strong>signal → bottleneck → murid → priority → action → follow-up</strong>. Data attendance yang digunakan ialah rekod agregat hari tidak hadir; kadar kehadiran tidak diandaikan tanpa denominator.</p></div></div></section>
   </div>;
 }
-function ProgressOverview({label,value,tone}:{label:string;value:number;tone:'teal'|'gold'|'navy'}){return <div><div className="mb-1 flex items-center justify-between text-sm"><span>{label}</span><span className="font-bold">{value}%</span></div><ProgressBar value={value} tone={tone}/></div>}
-function Metric({label,value}:{label:string;value:string}){return <div className="rounded-lg bg-slate-50 px-3 py-2"><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 text-lg font-extrabold text-navy-950">{value}</p></div>}
+
+function ProgressOverview({ label, value, tone }: { label: string; value: number; tone: 'teal' | 'gold' | 'navy' }) { return <div><div className="mb-1 flex items-center justify-between text-sm"><span>{label}</span><span className="font-bold">{value}%</span></div><ProgressBar value={value} tone={tone}/></div>; }
+function Signal({ label, value, detail, critical }: { label: string; value: number; detail: string; critical: boolean }) { return <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2"><div><p className="text-xs font-bold text-navy-900">{label}</p><p className="text-[11px] text-slate-500">{detail}</p></div><span className={`text-lg font-extrabold ${critical ? 'text-rose-700' : 'text-teal-700'}`}>{value}</span></div>; }
+function CommandQuestion({ title, text, warning = false }: { title: string; text: string; warning?: boolean }) { return <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex items-start gap-2"><AlertTriangle size={17} className={warning ? 'text-amber-600' : 'text-teal-700'}/><p className="text-sm font-bold text-navy-950">{title}</p></div><p className="mt-2 text-sm text-slate-600">{text}</p></div>; }
