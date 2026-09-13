@@ -1,6 +1,6 @@
 export type { DataProvider } from './DataProvider';
 export { mockDataProvider, MockDataProvider } from './MockDataProvider';
 
-// Phase 3 will provide SupabaseDataProvider. Keeping the contract here lets
-// React pages and domain services remain independent of the persistence layer.
+// Keep the persistence boundary explicit. Phase 2 defaults to mock data;
+// Phase 3 can switch the implementation without changing pages or services.
 export const getConfiguredProvider = () => mockDataProvider;
