@@ -10,6 +10,7 @@ const STATUS_STYLES: Record<string, string> = {
   Completed: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   'On Watch': 'bg-gold-50 text-gold-700 ring-gold-200',
   'Excellence Track': 'bg-slate-100 text-navy-800 ring-slate-300',
+  Unassessed: 'bg-slate-100 text-slate-600 ring-slate-300',
   'Not Started': 'bg-slate-100 text-slate-600 ring-slate-200',
 };
 
