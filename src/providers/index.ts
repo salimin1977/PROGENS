@@ -1,3 +1,4 @@
+import type { DataProvider } from './DataProvider';
 export type { DataProvider } from './DataProvider';
 export { MockDataProvider } from './MockDataProvider';
 export { SupabaseDataProvider } from './SupabaseDataProvider';
