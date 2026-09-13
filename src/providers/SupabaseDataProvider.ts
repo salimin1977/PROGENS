@@ -41,11 +41,11 @@ export class SupabaseDataProvider implements DataProvider {
     return (students ?? []).map((row) => {
       const studentResults = resultsByStudent.get(row.id) ?? [];
       const validResults = studentResults.filter((result) => result.maximum_marks != null && Number(result.maximum_marks) > 0);
-      const academicScore = validResults.length
+      const hasAssessment = validResults.length > 0;
+      const academicScore = hasAssessment
         ? Math.round((validResults.reduce((sum, result) => sum + (Number(result.marks ?? 0) / Number(result.maximum_marks)) * 100, 0) / validResults.length) * 10) / 10
         : 0;
-      const riskLevel = riskMap[row.risk_level] ?? 'Low';
-      const hasAssessment = validResults.length > 0;
+      const riskLevel = hasAssessment ? (riskMap[row.risk_level] ?? 'Low') : 'Unassessed';
 
       return {
         id: row.id,
@@ -56,7 +56,7 @@ export class SupabaseDataProvider implements DataProvider {
         academicScore,
         attendanceRate: 0,
         riskLevel,
-        status: hasAssessment && (riskLevel === 'Critical' || riskLevel === 'High') ? 'On Watch' : 'Active',
+        status: hasAssessment && (riskLevel === 'Critical' || riskLevel === 'High') ? 'On Watch' : hasAssessment ? 'Active' : 'Unassessed',
         subjects: validResults.map((result) => ({
           subject: subjectMap.get(result.subject_id) ?? result.subject_id,
           score: Math.round(Number(result.marks ?? 0) * 10) / 10,
