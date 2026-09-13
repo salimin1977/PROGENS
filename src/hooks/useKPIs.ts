@@ -33,9 +33,19 @@ export function useKPIs() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
+
     getSchoolKPIs()
-      .then(toDashboardKPIs)
-      .finally(() => setLoading(false));
+      .then((items) => {
+        if (active) setData(toDashboardKPIs(items));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   return { data, loading };
