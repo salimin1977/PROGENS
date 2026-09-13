@@ -14,4 +14,4 @@ assert.equal(calculatePassRate([result(39, 'G'), result(40, 'E')]), 50);
 const student = (g: number): Student => ({ id: 's1', name: 'Test Student', gender: 'Male', className: '5 Sains', form: 'Tingkatan 5', academicScore: 45, attendanceRate: 88, riskLevel: 'Critical', status: 'On Watch', subjects: Array.from({ length: g }, (_, i) => ({ subject: `S${i}`, score: 30, grade: 'G' })), talents: [], stemTrack: false, stemReadiness: 20, progressTimeline: [], guardianContact: '', photoInitials: 'TS' });
 const critical = calculateStudentRisk(student(4));
 assert.equal(critical.riskLevel, 'Critical');
-assert.equal(generateInterventionRecommendation(student(4)), 'ATTENDANCE_INTERVENTION');
+assert.equal(generateInterventionRecommendation(student(4)), 'ACADEMIC_RESCUE');
