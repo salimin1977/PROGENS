@@ -21,7 +21,15 @@ export interface AcademicResult {
   id: string; studentId: string; subject: string; assessment: AssessmentType;
   marks: number; maximumMarks: number; grade: string;
 }
-export interface AttendanceRecord { id: string; studentId: string; date: string; rate: number; }
+export interface AttendanceRecord {
+  id: string;
+  studentId: string;
+  date: string;
+  rate?: number;
+  absentDays: number;
+  academicYear: number;
+  sourceLabel: string;
+}
 export type InterventionStatus = 'Critical' | 'Active' | 'Monitoring' | 'Completed';
 export interface Intervention {
   id: string; studentId: string; studentName: string; className: string; problem: string;
