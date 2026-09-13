@@ -1,8 +1,10 @@
 import type { Form, RiskLevel, Student } from '../types';
-import { mockDataProvider } from '../providers/MockDataProvider';
+import { getConfiguredProvider } from '../providers';
 
-export const getStudents = async (): Promise<Student[]> => mockDataProvider.getStudents();
-export const getStudentById = async (id: string) => mockDataProvider.getStudentById(id);
+const provider = () => getConfiguredProvider();
+
+export const getStudents = async (): Promise<Student[]> => provider().getStudents();
+export const getStudentById = async (id: string) => provider().getStudentById(id);
 export const getStudentsByForm = async (form: Form) => (await getStudents()).filter((s) => s.form === form);
 export const getStudentsByClass = async (className: string) => (await getStudents()).filter((s) => s.className === className);
 export const searchStudents = async (query: string) => {
