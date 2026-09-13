@@ -1,7 +1,7 @@
 import type { Intervention } from '../types';
-import { mockDataProvider } from '../providers/MockDataProvider';
+import { getConfiguredProvider } from '../providers';
 
-export const getInterventions = async () => mockDataProvider.getInterventions();
+export const getInterventions = async () => getConfiguredProvider().getInterventions();
 export const getActiveInterventions = async () => (await getInterventions()).filter((i) => i.status === 'Active' || i.status === 'Critical');
 export const getCriticalInterventions = async () => (await getInterventions()).filter((i) => i.status === 'Critical');
 export const getStudentInterventions = async (studentId: string) => (await getInterventions()).filter((i) => i.studentId === studentId);
