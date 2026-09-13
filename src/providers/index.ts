@@ -1,7 +1,11 @@
 export type { DataProvider } from './DataProvider';
 export { MockDataProvider } from './MockDataProvider';
-import { MockDataProvider } from './MockDataProvider';
+export { SupabaseDataProvider } from './SupabaseDataProvider';
 
-// Keep the persistence boundary explicit. Phase 2 defaults to mock data;
-// Phase 3 can switch the implementation without changing pages or services.
-export const getConfiguredProvider = () => new MockDataProvider();
+import { MockDataProvider } from './MockDataProvider';
+import { SupabaseDataProvider } from './SupabaseDataProvider';
+import { isSupabaseConfigured } from '../lib/supabaseRest';
+
+/** Phase 3: use live Supabase when configured; retain mock fallback for local development. */
+export const getConfiguredProvider = () =>
+  isSupabaseConfigured ? new SupabaseDataProvider() : new MockDataProvider();
