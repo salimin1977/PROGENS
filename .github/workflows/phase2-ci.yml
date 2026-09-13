@@ -1,9 +1,9 @@
-name: PROGENS Phase 2 CI
+name: PROGENS Build Validation
 on:
   push:
-    branches: ['main', 'phase-2-data-engine']
+    branches: ['main', 'phase-2-data-engine', 'phase-3-supabase-provider']
   pull_request:
-    branches: ['main']
+    branches: ['main', 'phase-3-supabase-provider']
   workflow_dispatch:
 jobs:
   build:
