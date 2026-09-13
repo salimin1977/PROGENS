@@ -14,27 +14,55 @@ function client() {
 export class SupabaseDataProvider implements DataProvider {
   async getStudents(): Promise<Student[]> {
     const db = client();
-    const [{ data: students, error: studentError }, { data: classes, error: classError }] = await Promise.all([
+    const [{ data: students, error: studentError }, { data: classes, error: classError }, { data: results, error: resultError }] = await Promise.all([
       db.from('students').select('id,name,gender,class_id,form,risk_level').eq('is_active', true).order('name'),
       db.from('classes').select('id,name,form'),
+      db.from('academic_results').select('student_id,subject_id,marks,maximum_marks,grade'),
     ]);
     if (studentError) throw studentError;
     if (classError) throw classError;
+    if (resultError) throw resultError;
+
     const classMap = new Map((classes ?? []).map((row) => [row.id, row.name]));
+    const subjectIds = [...new Set((results ?? []).map((row) => row.subject_id))];
+    const { data: subjects, error: subjectError } = subjectIds.length
+      ? await db.from('subjects').select('id,name').in('id', subjectIds)
+      : { data: [], error: null };
+    if (subjectError) throw subjectError;
+    const subjectMap = new Map((subjects ?? []).map((row) => [row.id, row.name]));
+
+    const resultsByStudent = new Map<string, typeof results>();
+    for (const result of results ?? []) {
+      const existing = resultsByStudent.get(result.student_id) ?? [];
+      existing.push(result);
+      resultsByStudent.set(result.student_id, existing);
+    }
 
     return (students ?? []).map((row) => {
+      const studentResults = resultsByStudent.get(row.id) ?? [];
+      const validResults = studentResults.filter((result) => result.maximum_marks != null && Number(result.maximum_marks) > 0);
+      const academicScore = validResults.length
+        ? Math.round((validResults.reduce((sum, result) => sum + (Number(result.marks ?? 0) / Number(result.maximum_marks)) * 100, 0) / validResults.length) * 10) / 10
+        : 0;
       const riskLevel = riskMap[row.risk_level] ?? 'Low';
+      const hasAssessment = validResults.length > 0;
+
       return {
         id: row.id,
         name: row.name,
         gender: row.gender === 'F' || row.gender === 'Female' ? 'Female' : 'Male',
         className: classMap.get(row.class_id) ?? '',
         form: row.form as Student['form'],
-        academicScore: 0,
+        academicScore,
         attendanceRate: 0,
         riskLevel,
-        status: riskLevel === 'Critical' || riskLevel === 'High' ? 'On Watch' : 'Active',
-        subjects: [], talents: [], stemTrack: false, stemReadiness: 0,
+        status: hasAssessment && (riskLevel === 'Critical' || riskLevel === 'High') ? 'On Watch' : 'Active',
+        subjects: validResults.map((result) => ({
+          subject: subjectMap.get(result.subject_id) ?? result.subject_id,
+          score: Math.round(Number(result.marks ?? 0) * 10) / 10,
+          grade: result.grade ?? '',
+        })),
+        talents: [], stemTrack: false, stemReadiness: 0,
         progressTimeline: [], guardianContact: '',
         photoInitials: row.name.split(/\s+/).slice(0, 2).map((part: string) => part[0]).join('').toUpperCase(),
       };
