@@ -1,7 +1,10 @@
 export type { DataProvider } from './DataProvider';
 export { MockDataProvider } from './MockDataProvider';
+export { SupabaseDataProvider } from './SupabaseDataProvider';
 import { MockDataProvider } from './MockDataProvider';
+import { SupabaseDataProvider } from './SupabaseDataProvider';
+import { isSupabaseConfigured } from '../lib/supabase';
 
-// Keep the persistence boundary explicit. Phase 2 defaults to mock data;
-// Phase 3 can switch the implementation without changing pages or services.
-export const getConfiguredProvider = () => new MockDataProvider();
+/** Live Supabase is selected only when both Vite environment variables exist. */
+export const getConfiguredProvider = (): DataProvider =>
+  isSupabaseConfigured ? new SupabaseDataProvider() : new MockDataProvider();
