@@ -1,102 +1,23 @@
-import { Wheat, ArrowDown, Award, AlertTriangle } from 'lucide-react';
-import KPICard from '../components/ui/KPICard';
-import ChartCard from '../components/ui/ChartCard';
-import StudentCard from '../components/ui/StudentCard';
-import { students } from '../data/students';
-import { academicKpi } from '../data/academic';
-import { interventions } from '../data/interventions';
+import { Wheat, Target, AlertTriangle, Award } from 'lucide-react';
+import StatusBadge from '../components/ui/StatusBadge';
+import { usePhase5 } from '../hooks/usePhase5';
 
 export default function Reap() {
-  const form5 = students.filter((s) => s.form === 'Tingkatan 5');
-  const aPlusStudents = form5.filter((s) => s.subjects.every((sub) => sub.score >= 80));
-  const atRiskStudents = form5.filter((s) => s.riskLevel === 'Critical' || s.riskLevel === 'High');
-  const eliteStudents = [...form5].sort((a, b) => b.academicScore - a.academicScore).slice(0, 6);
-  const passRate = Math.round((form5.filter((s) => s.academicScore >= 40).length / form5.length) * 1000) / 10;
-  const form5Interventions = interventions.filter((i) => atRiskStudents.some((s) => s.id === i.studentId));
+  const { data, loading, error } = usePhase5();
+  if (loading) return <p className="text-sm text-slate-500">Loading REAP from live data...</p>;
+  if (error || !data) return <p className="text-sm text-rose-600">Unable to load REAP: {error ?? 'No data.'}</p>;
+  const rows = data.students.filter((r) => r.reap).sort((a, b) => priorityRank(a.reap?.priority) - priorityRank(b.reap?.priority) || (a.reap?.spmReadiness ?? 0) - (b.reap?.spmReadiness ?? 0));
+  const elite = rows.filter((r) => (r.reap?.spmReadiness ?? 0) >= 90).slice(0, 6);
+  const p1 = rows.filter((r) => r.reap?.priority === 'P1');
+  const assessed = data.reap.assessed;
 
-  return (
-    <div className="space-y-6">
-      <div className="card flex items-start gap-4 p-5">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-navy-900 text-gold-300">
-          <Wheat size={22} />
-        </div>
-        <div>
-          <h2 className="text-base font-extrabold text-navy-950">REAP — Results Excellence & Achievement Programme</h2>
-          <p className="mt-1 text-sm text-slate-500">Focused on Tingkatan 5, driving SPM outcomes toward the GPS 4.84 target.</p>
-        </div>
-      </div>
-
-      <section>
-        <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-navy-900">SPM Performance Command</h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <KPICard label="GPS Current" value={academicKpi.gpsCurrent.toFixed(2)} icon={ArrowDown} tone="warning" />
-          <KPICard label="GPS Target" value={academicKpi.gpsTarget.toFixed(2)} icon={ArrowDown} tone="positive" />
-          <KPICard label="Pass Rate" value={`${passRate}%`} icon={Award} tone="positive" />
-          <KPICard label="A+ Students" value={aPlusStudents.length.toString()} icon={Award} tone="positive" />
-          <KPICard label="At-Risk Students" value={atRiskStudents.length.toString()} icon={AlertTriangle} tone="critical" />
-        </div>
-      </section>
-
-      <ChartCard title="Road to 4.84" description="Strategic pathway from current performance to school target">
-        <div className="flex flex-col items-center gap-3 py-4 sm:flex-row sm:justify-center sm:gap-6">
-          <RoadStep label="Current GPS" value={academicKpi.gpsCurrent.toFixed(2)} tone="warning" />
-          <ArrowConnector />
-          <RoadStep label="Intervention" value="REAP + SEEDS/GROW Continuum" tone="neutral" wide />
-          <ArrowConnector />
-          <RoadStep label="Target GPS" value={academicKpi.gpsTarget.toFixed(2)} tone="positive" />
-        </div>
-      </ChartCard>
-
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="card p-5">
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-navy-900">Elite Students</h3>
-          <div className="space-y-2">
-            {eliteStudents.map((s) => (
-              <StudentCard key={s.id} student={s} />
-            ))}
-          </div>
-        </div>
-
-        <div className="card p-5">
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-navy-900">High-Risk Students &amp; Intervention</h3>
-          {atRiskStudents.length === 0 ? (
-            <p className="text-sm text-slate-500">No high-risk students identified in Tingkatan 5.</p>
-          ) : (
-            <div className="space-y-2">
-              {atRiskStudents.slice(0, 6).map((s) => {
-                const intervention = form5Interventions.find((i) => i.studentId === s.id);
-                return (
-                  <div key={s.id} className="rounded-lg border border-slate-200 p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-navy-950">{s.name}</p>
-                      <span className="text-xs text-slate-400">{s.className}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">{intervention ? intervention.interventionType : 'Awaiting intervention assignment'}</p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-    </div>
-  );
+  return <div className="space-y-6">
+    <div className="card flex items-start gap-4 p-5"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-navy-900 text-gold-300"><Wheat size={22} /></div><div><h2 className="text-base font-extrabold text-navy-950">REAP — Results Excellence & Achievement Programme</h2><p className="mt-1 text-sm text-slate-500">Live Tingkatan 5 readiness command layer. SPM Readiness is a transparent academic proxy, not an official GPS prediction.</p></div></div>
+    <section className="grid grid-cols-2 gap-3 md:grid-cols-5"><Metric icon={Target} label="T5 Students" value={data.reap.total} /><Metric icon={Target} label="Assessed" value={assessed} /><Metric icon={Award} label="Average Index" value={data.reap.average ? data.reap.average.toFixed(1) : '—'} /><Metric icon={AlertTriangle} label="P1" value={data.reap.p1} /><Metric icon={Award} label="High Readiness" value={elite.length} /></section>
+    <div className="card p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-sm font-bold uppercase tracking-wide text-navy-900">REAP Priority Queue</h3><p className="text-xs text-slate-500">P1 = Critical/High risk; P2 = Moderate or significant absence signal; P3 = lower immediate risk.</p></div><span className="text-xs font-semibold text-slate-500">{rows.length} students</span></div><div className="space-y-3">{rows.map((r) => <div key={r.student.id} className="rounded-lg border border-slate-200 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold">{r.student.name}</p><p className="text-xs text-slate-500">{r.student.className} · Current {r.reap?.current.toFixed(1)} · Gap {r.reap?.gap.toFixed(1)}</p></div><div className="flex items-center gap-2"><StatusBadge status={r.reap?.risk ?? 'Unassessed'} /><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-navy-800">{r.reap?.priority}</span></div></div><div className="mt-3 grid gap-3 md:grid-cols-3"><div><p className="text-[11px] font-semibold uppercase text-slate-400">SPM readiness proxy</p><p className="text-sm font-bold">{r.reap?.spmReadiness.toFixed(1)} / 100</p></div><div><p className="text-[11px] font-semibold uppercase text-slate-400">Absence signal</p><p className="text-sm">{r.absentDays > 0 ? `${r.absentDays} hari tidak hadir` : 'Tiada rekod ketidakhadiran dalam sumber'}</p></div><div><p className="text-[11px] font-semibold uppercase text-slate-400">Intervention</p><p className="text-xs text-slate-600">{r.reap?.intervention}</p></div></div></div>)}</div></div>
+    <div className="card p-5"><h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-navy-900">Elite / Sustain</h3>{elite.length ? <div className="grid gap-2 md:grid-cols-2">{elite.map((r) => <div key={r.student.id} className="rounded-lg border border-slate-200 p-3"><p className="text-sm font-semibold">{r.student.name}</p><p className="text-xs text-slate-500">{r.student.className} · readiness {r.reap?.spmReadiness.toFixed(1)}</p></div>)}</div> : <p className="text-sm text-slate-500">No students currently reach the ≥90 readiness proxy threshold.</p>}</div>
+    {p1.length > 0 && <div className="rounded-lg border border-rose-200 bg-rose-50 p-4"><p className="text-sm font-bold text-rose-800">Action required: {p1.length} P1 students</p><p className="mt-1 text-xs text-rose-700">Assign or review intervention coverage before the next assessment cycle.</p></div>}
+  </div>;
 }
-
-function RoadStep({ label, value, tone, wide }: { label: string; value: string; tone: 'warning' | 'positive' | 'neutral'; wide?: boolean }) {
-  const toneStyles = {
-    warning: 'bg-gold-50 text-gold-800 ring-gold-200',
-    positive: 'bg-teal-50 text-teal-800 ring-teal-200',
-    neutral: 'bg-slate-50 text-navy-800 ring-slate-200',
-  }[tone];
-  return (
-    <div className={`rounded-xl px-5 py-4 text-center ring-1 ${toneStyles} ${wide ? 'sm:min-w-[220px]' : 'sm:min-w-[140px]'}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-wide">{label}</p>
-      <p className="mt-1 text-lg font-extrabold">{value}</p>
-    </div>
-  );
-}
-
-function ArrowConnector() {
-  return <div className="text-2xl font-bold text-slate-300 sm:rotate-[-90deg]">&darr;</div>;
-}
+function priorityRank(value?: string) { return value === 'P1' ? 1 : value === 'P2' ? 2 : 3; }
+function Metric({ icon: Icon, label, value }: { icon: typeof Target; label: string; value: number | string }) { return <div className="card p-4"><div className="flex items-center gap-2 text-slate-500"><Icon size={15} /><span className="text-xs font-semibold">{label}</span></div><p className="mt-1 text-2xl font-extrabold text-navy-950">{value}</p></div>; }
