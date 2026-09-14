@@ -19,6 +19,7 @@ export interface Subject { id: string; name: string; code?: string; }
 export interface Assessment { id: string; type: AssessmentType; date: string; name?: string; }
 export interface AcademicResult {
   id: string; studentId: string; subject: string; assessment: AssessmentType;
+  assessmentId?: string; assessmentName?: string; assessmentDate?: string | null;
   marks: number; maximumMarks: number; grade: string;
 }
 export interface AttendanceRecord {
