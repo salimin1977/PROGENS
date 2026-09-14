@@ -19,9 +19,15 @@ function containsProhibitedIdentityField(value: unknown, seen = new Set<object>(
   return Object.entries(value as Record<string, unknown>).some(([key, child]) => PROHIBITED_IDENTITY_KEYS.has(normaliseKey(key)) || containsProhibitedIdentityField(child, seen));
 }
 function latestDate(values: Array<string | null | undefined>): string | null {
-  const valid = values.filter((value): value is string => Boolean(value) && !Number.isNaN(Date.parse(value)));
-  if (!valid.length) return null;
-  return valid.sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+  let latest: string | null = null;
+  let latestTimestamp = -Infinity;
+  for (const value of values) {
+    if (!value) continue;
+    const timestamp = Date.parse(value);
+    if (Number.isNaN(timestamp)) continue;
+    if (timestamp > latestTimestamp) { latest = value; latestTimestamp = timestamp; }
+  }
+  return latest;
 }
 
 export function buildProductionReadiness(input: BuildProductionReadinessInput): ProductionReadinessResult {
@@ -37,14 +43,16 @@ export function buildProductionReadiness(input: BuildProductionReadinessInput): 
     const severity: ProductionSeverity = ['student-master', 'result-links', 'marks-range', 'attendance-links', 'intervention-links'].includes(qualityCheck.id) ? 'CRITICAL' : 'MAJOR';
     add({ id: `data-${qualityCheck.id}`, category: 'DATA', label: qualityCheck.label, status: qualityCheck.status, severity, detail: qualityCheck.detail, recommendation: qualityCheck.status === 'PASS' ? 'No action required.' : 'Review the Data Health findings before relying on the affected data.' });
   }
-  const datedResults = results.filter((result) => result.assessmentDate && !Number.isNaN(Date.parse(result.assessmentDate)));
+  const datedResults = results.filter((result) => Boolean(result.assessmentDate) && !Number.isNaN(Date.parse(result.assessmentDate ?? '')));
   const latestAssessmentDate = latestDate(datedResults.map((result) => result.assessmentDate ?? null));
   const latestAssessmentRows = latestAssessmentDate ? results.filter((result) => result.assessmentDate === latestAssessmentDate) : results;
   const latestAssessment = latestAssessmentRows[0];
   const latestAssessmentStudents = new Set(latestAssessmentRows.map((result) => result.studentId));
   const assessmentCoverage = students.length ? Math.round((latestAssessmentStudents.size / students.length) * 100) : 0;
   const assessmentStatus: ProductionCheckStatus = results.length === 0 ? 'WARN' : latestAssessmentDate ? (assessmentCoverage >= 90 ? 'PASS' : 'WARN') : 'WARN';
-  add({ id: 'assessment-freshness', category: 'ASSESSMENT', label: 'Assessment freshness', status: assessmentStatus, severity: 'MAJOR', detail: results.length === 0 ? 'No academic assessment records are available.' : `Latest assessment: ${latestAssessment?.assessmentName || latestAssessment?.assessment || 'Assessment identity unavailable'} • ${latestAssessmentDate ?? 'Date unavailable'} • coverage ${assessmentCoverage}%.`, recommendation: assessmentStatus === 'PASS' ? 'No action required.' : 'Verify the latest assessment identity/date and coverage; do not invent missing dates.' });
+  const assessmentName = latestAssessment?.assessmentName ?? latestAssessment?.assessment ?? 'Assessment identity unavailable';
+  const assessmentType = latestAssessment?.assessment ?? 'Unknown';
+  add({ id: 'assessment-freshness', category: 'ASSESSMENT', label: 'Assessment freshness', status: assessmentStatus, severity: 'MAJOR', detail: results.length === 0 ? 'No academic assessment records are available.' : `Latest assessment: ${assessmentName} • ${latestAssessmentDate ?? 'Date unavailable'} • coverage ${assessmentCoverage}%.`, recommendation: assessmentStatus === 'PASS' ? 'No action required.' : 'Verify the latest assessment identity/date and coverage; do not invent missing dates.' });
   const invalidAttendanceRate = attendance.some((row) => row.rate !== undefined && (row.rate < 0 || row.rate > 100));
   const attendanceHasVerifiedRate = attendance.some((row) => row.rate !== undefined);
   add({ id: 'attendance-integrity', category: 'ATTENDANCE', label: 'Attendance integrity', status: invalidAttendanceRate ? 'FAIL' : 'PASS', severity: 'CRITICAL', detail: invalidAttendanceRate ? 'Attendance rate contains values outside 0–100.' : attendanceHasVerifiedRate ? 'Verified attendance rates exist in the provider contract.' : 'Source is represented as absence days; no attendance percentage is inferred.', recommendation: invalidAttendanceRate ? 'Correct invalid attendance rate values.' : 'Keep absence days separate from attendance percentage unless a verified denominator/rate exists.' });
@@ -59,5 +67,5 @@ export function buildProductionReadiness(input: BuildProductionReadinessInput): 
   const warnings = checks.filter((check) => check.status === 'WARN').length;
   const gate: ProductionGate = criticalFailures > 0 ? 'NOT READY' : checks.some((check) => check.status === 'FAIL') || warnings > 0 ? 'READY WITH WARNINGS' : 'READY';
   add({ id: 'release-gate', category: 'RELEASE', label: 'Production release gate', status: gate === 'READY' ? 'PASS' : gate === 'READY WITH WARNINGS' ? 'WARN' : 'FAIL', severity: 'CRITICAL', detail: gate === 'READY' ? 'No production-blocking checks failed.' : gate === 'READY WITH WARNINGS' ? 'No critical check failed, but warnings or non-critical failures remain.' : `${criticalFailures} critical production check(s) failed.`, recommendation: gate === 'READY' ? 'Proceed only after final human review.' : 'Resolve the checks identified as production blockers before release.' });
-  return { checks, gate, criticalFailures, warnings, quality, latestAssessment: { name: latestAssessment?.assessmentName || latestAssessment?.assessment || 'Assessment identity unavailable', type: latestAssessment?.assessment || 'Unknown', date: latestAssessmentDate, coverage: assessmentCoverage }, latestAttendanceDate: latestDate(attendance.map((row) => row.date)), latestInterventionDate };
+  return { checks, gate, criticalFailures, warnings, quality, latestAssessment: { name: assessmentName, type: assessmentType, date: latestAssessmentDate, coverage: assessmentCoverage }, latestAttendanceDate: latestDate(attendance.map((row) => row.date)), latestInterventionDate };
 }
