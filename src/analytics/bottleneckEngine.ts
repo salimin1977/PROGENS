@@ -17,6 +17,38 @@ const severity = (average: number): BottleneckItem['severity'] => {
   return 'Monitor';
 };
 
+const assessmentRank = (result: AcademicResult): number => {
+  const name = (result.assessmentName ?? '').toUpperCase();
+  if (name.includes('PERCUBAAN') && name.includes('SPM')) return 100;
+  if (name.includes('SPM')) return 90;
+  if (name.includes('PPSA')) return 70;
+  if (name.includes('PASA')) return 60;
+  if (name.includes('PPT')) return 50;
+  if (name.includes('TOV')) return 10;
+  return 1;
+};
+
+/** Select one current result per student+subject when multiple assessments exist. */
+export const selectLatestAssessmentResults = (results: AcademicResult[]): AcademicResult[] => {
+  const selected = new Map<string, AcademicResult>();
+  for (const result of results) {
+    const key = `${result.studentId}::${result.subject}`;
+    const current = selected.get(key);
+    if (!current) {
+      selected.set(key, result);
+      continue;
+    }
+    const currentRank = assessmentRank(current);
+    const resultRank = assessmentRank(result);
+    const currentDate = current.assessmentDate ?? '';
+    const resultDate = result.assessmentDate ?? '';
+    if (resultRank > currentRank || (resultRank === currentRank && resultDate > currentDate)) {
+      selected.set(key, result);
+    }
+  }
+  return [...selected.values()];
+};
+
 const toItem = (
   key: string,
   average: number,
@@ -38,8 +70,8 @@ const toItem = (
 };
 
 const scopedResults = (results: AcademicResult[], assessmentId?: string): AcademicResult[] => {
-  if (!assessmentId) return results;
-  return results.filter((result) => result.assessmentId === assessmentId);
+  const scoped = assessmentId ? results.filter((result) => result.assessmentId === assessmentId) : results;
+  return assessmentId ? scoped : selectLatestAssessmentResults(scoped);
 };
 
 export const calculateSubjectBottlenecks = (
