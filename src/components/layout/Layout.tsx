@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import ProductionStatusCard from '../system/ProductionStatusCard';
 
 const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   '/': { title: 'PROGENS Command Centre', subtitle: 'From Potential to Progress to Excellence' },
@@ -17,6 +18,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   '/nexus': { title: 'NEXUS', subtitle: 'Integrated Data & Intelligence Hub' },
   '/intelligence': { title: 'School Intelligence', subtitle: 'Signal, insight and decision layer' },
   '/data-health': { title: 'Data Health', subtitle: 'Production readiness and data governance checks' },
+  '/production': { title: 'Production Readiness', subtitle: 'Trust, health, privacy, freshness and release control' },
   '/reports': { title: 'Report Centre', subtitle: 'Generate and review institutional reports' },
   '/settings': { title: 'Settings', subtitle: 'School profile, KPI targets and configuration' },
 };
@@ -31,5 +33,5 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const meta = resolveMeta(location.pathname);
-  return <div className="flex min-h-screen bg-slate-50"><Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} /><div className="flex min-w-0 flex-1 flex-col"><Header title={meta.title} subtitle={meta.subtitle} onMenuClick={() => setSidebarOpen(true)} /><main className="flex-1 px-4 py-6 sm:px-6 lg:px-8"><Outlet /></main></div></div>;
+  return <div className="flex min-h-screen bg-slate-50"><Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} /><div className="flex min-w-0 flex-1 flex-col"><Header title={meta.title} subtitle={meta.subtitle} onMenuClick={() => setSidebarOpen(true)} /><main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{location.pathname === '/' && <ProductionStatusCard />}<Outlet /></main></div></div>;
 }
