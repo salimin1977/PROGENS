@@ -14,30 +14,18 @@ import Olympus from './pages/Olympus';
 import Nexus from './pages/Nexus';
 import Intelligence from './pages/Intelligence';
 import DataHealth from './pages/DataHealth';
+import Production from './pages/Production';
+import CommandHQPage from './pages/CommandHQPage';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 
 export default function App() {
-  return (
-    <Routes>
-      <Route element={<Layout />}>
-        <Route path="/" element={<Command />} />
-        <Route path="/students" element={<Students />} />
-        <Route path="/students/:studentId" element={<StudentProfile />} />
-        <Route path="/academic" element={<Academic />} />
-        <Route path="/attendance" element={<Attendance />} />
-        <Route path="/intervention" element={<Intervention />} />
-        <Route path="/seeds" element={<Seeds />} />
-        <Route path="/grow" element={<Grow />} />
-        <Route path="/reap" element={<Reap />} />
-        <Route path="/stem" element={<Stem />} />
-        <Route path="/olympus" element={<Olympus />} />
-        <Route path="/nexus" element={<Nexus />} />
-        <Route path="/intelligence" element={<Intelligence />} />
-        <Route path="/data-health" element={<DataHealth />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/settings" element={<Settings />} />
-      </Route>
-    </Routes>
-  );
+  return <Routes><Route element={<Layout />}>
+    <Route path="/" element={<Command />} /><Route path="/students" element={<Students />} /><Route path="/students/:studentId" element={<StudentProfile />} />
+    <Route path="/academic" element={<Academic />} /><Route path="/attendance" element={<Attendance />} /><Route path="/intervention" element={<Intervention />} />
+    <Route path="/seeds" element={<Seeds />} /><Route path="/grow" element={<Grow />} /><Route path="/reap" element={<Reap />} /><Route path="/stem" element={<Stem />} />
+    <Route path="/intelligence" element={<Intelligence />} /><Route path="/olympus" element={<Olympus />} /><Route path="/nexus" element={<Nexus />} />
+    <Route path="/data-health" element={<DataHealth />} /><Route path="/production" element={<Production />} /><Route path="/command-hq" element={<CommandHQPage />} />
+    <Route path="/reports" element={<Reports />} /><Route path="/settings" element={<Settings />} />
+  </Route></Routes>;
 }
