@@ -17,6 +17,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   '/nexus': { title: 'NEXUS', subtitle: 'Integrated Data & Intelligence Hub' },
   '/intelligence': { title: 'School Intelligence', subtitle: 'Signal, insight and decision layer' },
   '/data-health': { title: 'Data Health', subtitle: 'Production readiness and data governance checks' },
+  '/production': { title: 'Production Readiness', subtitle: 'Trust, health, privacy, freshness and release control' },
   '/reports': { title: 'Report Centre', subtitle: 'Generate and review institutional reports' },
   '/settings': { title: 'Settings', subtitle: 'School profile, KPI targets and configuration' },
 };
