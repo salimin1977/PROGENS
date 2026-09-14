@@ -7,7 +7,7 @@ import ProgressBar from '../components/ui/ProgressBar';
 import { getConfiguredProvider } from '../providers';
 import type { AcademicResult, AttendanceRecord, Intervention, Student } from '../types';
 import { useKPIs } from '../hooks/useKPIs';
-import { calculateClassBottlenecks, calculateSubjectBottlenecks } from '../analytics/bottleneckEngine';
+import { calculateClassBottlenecks, calculateSubjectBottlenecks, selectLatestAssessmentResults } from '../analytics/bottleneckEngine';
 
 const provider = () => getConfiguredProvider();
 const RISK_WEIGHT: Record<string, number> = { Critical: 40, High: 30, Moderate: 15, Low: 0, Unassessed: 20 };
@@ -21,13 +21,20 @@ export default function Command() {
   const [interventions, setInterventions] = useState<Intervention[]>([]);
   const [academicResults, setAcademicResults] = useState<AcademicResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     Promise.all([provider().getStudents(), provider().getAttendance(), provider().getInterventions(), provider().getAcademicResults()])
       .then(([studentRows, attendanceRows, interventionRows, academicRows]) => {
         if (!active) return;
-        setStudents(studentRows); setAttendance(attendanceRows); setInterventions(interventionRows); setAcademicResults(academicRows);
+        setStudents(studentRows);
+        setAttendance(attendanceRows);
+        setInterventions(interventionRows);
+        setAcademicResults(academicRows);
+      })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : 'Gagal memuatkan data Command Centre.');
       })
       .finally(() => active && setLoading(false));
     return () => { active = false; };
@@ -35,60 +42,97 @@ export default function Command() {
 
   const absenceMap = useMemo(() => new Map(attendance.map((row) => [row.studentId, row.absentDays ?? 0])), [attendance]);
   const interventionStudentIds = useMemo(() => new Set(interventions.filter((item) => item.status === 'Active' || item.status === 'Critical' || item.status === 'Monitoring').map((item) => item.studentId)), [interventions]);
+  const latestResults = useMemo(() => selectLatestAssessmentResults(academicResults), [academicResults]);
+  const academicScoreMap = useMemo(() => {
+    const grouped = new Map<string, number[]>();
+    for (const result of latestResults) {
+      if (result.maximumMarks <= 0) continue;
+      const scores = grouped.get(result.studentId) ?? [];
+      scores.push((result.marks / result.maximumMarks) * 100);
+      grouped.set(result.studentId, scores);
+    }
+    return new Map([...grouped.entries()].map(([id, scores]) => [id, scores.reduce((sum, value) => sum + value, 0) / scores.length]));
+  }, [latestResults]);
   const subjectBottlenecks = useMemo(() => calculateSubjectBottlenecks(academicResults, students).slice(0, 3), [academicResults, students]);
   const classBottlenecks = useMemo(() => calculateClassBottlenecks(academicResults, students).slice(0, 3), [academicResults, students]);
 
   const priorityQueue = useMemo<CommandItem[]>(() => students.map((student) => {
     const absentDays = absenceMap.get(student.id) ?? 0;
-    const academicPenalty = student.academicScore <= 50 ? 20 : student.academicScore <= 65 ? 10 : 0;
+    const academicScore = academicScoreMap.get(student.id) ?? student.academicScore;
+    const academicPenalty = academicScore <= 50 ? 20 : academicScore <= 65 ? 10 : 0;
     const absencePenalty = absentDays >= 20 ? 25 : absentDays >= 10 ? 15 : absentDays >= 5 ? 8 : 0;
     const interventionGap = !interventionStudentIds.has(student.id) && (student.riskLevel === 'Critical' || student.riskLevel === 'High') ? 10 : 0;
     const score = RISK_WEIGHT[student.riskLevel] + academicPenalty + absencePenalty + interventionGap;
-    const reasons = [student.riskLevel !== 'Low' && student.riskLevel !== 'Unassessed' ? `Risiko ${student.riskLevel}` : '', absentDays >= 10 ? `${absentDays} hari tidak hadir` : '', student.academicScore <= 65 ? `Prestasi ${student.academicScore.toFixed(0)}%` : '', interventionGap > 0 ? 'Tiada intervensi aktif' : ''].filter(Boolean);
+    const reasons = [
+      student.riskLevel !== 'Low' && student.riskLevel !== 'Unassessed' ? `Risiko ${student.riskLevel}` : '',
+      absentDays >= 10 ? `${absentDays} hari tidak hadir` : '',
+      academicScore <= 65 ? `Prestasi ${academicScore.toFixed(0)}%` : '',
+      interventionGap > 0 ? 'Tiada intervensi aktif' : '',
+    ].filter(Boolean);
     const action = interventionGap > 0 ? 'Buka intervensi' : absentDays >= 10 ? 'Semak kehadiran & punca' : 'Semak kemajuan';
     return { student, absentDays, score, reason: reasons.join(' • ') || 'Perlu semakan data', action };
-  }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score).slice(0, 8), [students, absenceMap, interventionStudentIds]);
+  }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score).slice(0, 8), [students, absenceMap, interventionStudentIds, academicScoreMap]);
 
   const coverage = students.length ? Math.round((students.filter((s) => s.riskLevel !== 'Unassessed').length / students.length) * 100) : 0;
   const criticalHigh = students.filter((s) => s.riskLevel === 'Critical' || s.riskLevel === 'High').length;
   const unassessed = students.filter((s) => s.riskLevel === 'Unassessed').length;
-  const activeInterventions = interventions.filter((i) => i.status === 'Active' || i.status === 'Critical').length;
-  const commandStatus = criticalHigh > activeInterventions ? 'ACTION REQUIRED' : unassessed > 0 ? 'DATA COVERAGE GAP' : 'MONITOR';
+  const activeInterventionStudents = interventionStudentIds.size;
+  const interventionGapCount = Math.max(0, criticalHigh - activeInterventionStudents);
+  const commandStatus = error ? 'DATA COVERAGE GAP' : interventionGapCount > 0 ? 'ACTION REQUIRED' : unassessed > 0 ? 'DATA COVERAGE GAP' : 'MONITOR';
+
+  const studentMap = useMemo(() => new Map(students.map((student) => [student.id, student])), [students]);
 
   return <div className="space-y-6">
     <section>
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">Fasa 4 • Command Centre</p><h2 className="mt-1 text-2xl font-extrabold text-navy-950">Apa yang perlu tindakan dahulu?</h2></div><span className={`rounded-full px-3 py-1 text-xs font-extrabold ${commandStatus === 'ACTION REQUIRED' ? 'bg-rose-100 text-rose-700' : commandStatus === 'DATA COVERAGE GAP' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{commandStatus}</span></div>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">Fasa 4 • Command Centre</p><h2 className="mt-1 text-2xl font-extrabold text-navy-950">Apa yang perlu tindakan dahulu?</h2></div>
+        <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${commandStatus === 'ACTION REQUIRED' ? 'bg-rose-100 text-rose-700' : commandStatus === 'DATA COVERAGE GAP' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{commandStatus}</span>
+      </div>
+      {error && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{error}</div>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KPICard label="Total Students" value={kpiLoading ? '—' : String(kpi?.totalStudents ?? students.length)} icon={Users} tone="neutral" helperText="Live Supabase" />
         <KPICard label="Critical + High" value={loading ? '—' : String(criticalHigh)} icon={ShieldAlert} tone="critical" helperText="Priority queue" />
-        <KPICard label="Intervention Active" value={loading ? '—' : String(activeInterventions)} icon={LifeBuoy} tone="warning" helperText="Critical + Active" />
+        <KPICard label="Intervention Active" value={loading ? '—' : String(activeInterventionStudents)} icon={LifeBuoy} tone="warning" helperText="Distinct students" />
         <KPICard label="Data Coverage" value={loading ? '—' : `${coverage}%`} icon={Target} tone={coverage === 100 ? 'positive' : 'warning'} helperText={`${unassessed} belum dinilai`} />
         <KPICard label="Attendance Source" value={loading ? '—' : `${attendance.length}`} icon={CalendarCheck} tone="neutral" helperText="Aggregate records" />
       </div>
     </section>
 
     <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <ChartCard title="Decision Stack" description="KPI → bottleneck → risk → action"><div className="space-y-4"><ProgressOverview label="Risk Coverage" value={coverage} tone="teal" /><Signal label="Critical + High" value={criticalHigh} detail={criticalHigh > activeInterventions ? 'Intervention gap exists' : 'Covered by active cases'} critical={criticalHigh > activeInterventions} /><Signal label="Unassessed" value={unassessed} detail={unassessed ? 'Data diagnosis belum lengkap' : 'Coverage lengkap'} critical={unassessed > 0} /><Signal label="Priority Queue" value={priorityQueue.length} detail="Students requiring review" critical={priorityQueue.length > 0} /></div></ChartCard>
-      <ChartCard title="Priority Action Queue" description="Susunan tindakan berdasarkan signal semasa" className="lg:col-span-2">{loading ? <p className="py-12 text-center text-sm text-slate-500">Memuatkan data live…</p> : priorityQueue.length === 0 ? <p className="py-12 text-center text-sm text-slate-500">Tiada signal tindakan aktif daripada data semasa.</p> : <div className="space-y-2">{priorityQueue.map((item, index) => <div key={item.student.id} className="flex items-center gap-3 rounded-xl border border-slate-200 p-3"><span className="w-6 text-center text-xs font-extrabold text-slate-400">{index + 1}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="truncate font-bold text-navy-950">{item.student.name}</span><span className="text-xs text-slate-500">{item.student.className}</span></div><p className="mt-0.5 text-xs text-slate-500">{item.reason}</p></div><div className="hidden text-right sm:block"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Priority</p><p className="font-extrabold text-navy-950">{item.score}</p></div><Link to={`/students/${item.student.id}`} className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-2 text-xs font-bold text-teal-700 hover:bg-slate-200">{item.action}<ArrowRight size={14}/></Link></div>)}</div>}</ChartCard>
+      <ChartCard title="Decision Stack" description="KPI → bottleneck → risk → action">
+        <div className="space-y-4">
+          <ProgressOverview label="Risk Coverage" value={coverage} tone="teal" />
+          <Signal label="Critical + High" value={criticalHigh} detail={interventionGapCount ? `${interventionGapCount} murid belum ada intervensi aktif` : 'Covered by active cases'} critical={interventionGapCount > 0} />
+          <Signal label="Unassessed" value={unassessed} detail={unassessed ? 'Data diagnosis belum lengkap' : 'Coverage lengkap'} critical={unassessed > 0} />
+          <Signal label="Priority Queue" value={priorityQueue.length} detail="Students requiring review" critical={priorityQueue.length > 0} />
+        </div>
+      </ChartCard>
+      <ChartCard title="Priority Action Queue" description="Susunan tindakan berdasarkan signal semasa" className="lg:col-span-2">
+        {loading ? <p className="py-12 text-center text-sm text-slate-500">Memuatkan data live…</p> : priorityQueue.length === 0 ? <p className="py-12 text-center text-sm text-slate-500">Tiada signal tindakan aktif daripada data semasa.</p> : <div className="space-y-2">{priorityQueue.map((item, index) => <div key={item.student.id} className="flex items-center gap-3 rounded-xl border border-slate-200 p-3"><span className="w-6 text-center text-xs font-extrabold text-slate-400">{index + 1}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="truncate font-bold text-navy-950">{item.student.name}</span><span className="text-xs text-slate-500">{item.student.className}</span></div><p className="mt-0.5 text-xs text-slate-500">{item.reason}</p></div><div className="hidden text-right sm:block"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Priority</p><p className="font-extrabold text-navy-950">{item.score}</p></div><Link to={`/students/${item.student.id}`} className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-2 text-xs font-bold text-teal-700 hover:bg-slate-200">{item.action}<ArrowRight size={14}/></Link></div>)}</div>}
+      </ChartCard>
     </section>
 
     <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <ChartCard title="School Bottleneck — Apa masalah terbesar sekarang?" description="Purata markah relatif daripada academic_results yang tersedia.">
-        {subjectBottlenecks.length === 0 ? <EmptyBottleneck /> : <div className="space-y-3">{subjectBottlenecks.map((item, index) => <BottleneckRow key={item.key} rank={index + 1} item={item} />)}</div>}
-        <p className="mt-3 text-[11px] text-slate-400">Scope: rekod akademik yang kini tersedia dalam Supabase. Ini bukan dakwaan liputan penuh SPM.</p>
+      <ChartCard title="School Bottleneck — Apa masalah terbesar sekarang?" description="Purata markah relatif daripada keputusan terkini bagi setiap murid-subjek.">
+        {subjectBottlenecks.length === 0 ? <EmptyBottleneck /> : <div className="space-y-3">{subjectBottlenecks.map((item, index) => <BottleneckRow key={item.key} rank={index + 1} item={item} students={studentMap} />)}</div>}
+        <p className="mt-3 text-[11px] text-slate-400">Scope: satu keputusan terkini bagi setiap murid-subjek; jika terdapat Percubaan SPM, ia diutamakan. Coverage tetap bergantung pada data tersedia.</p>
       </ChartCard>
-      <ChartCard title="Class Bottleneck — Di mana?" description="Kelas dengan purata terendah berdasarkan rekod akademik tersedia.">
-        {classBottlenecks.length === 0 ? <EmptyBottleneck /> : <div className="space-y-3">{classBottlenecks.map((item, index) => <BottleneckRow key={item.key} rank={index + 1} item={item} />)}</div>}
-        <p className="mt-3 text-[11px] text-slate-400">Gunakan dapatan ini sebagai signal awal untuk semakan kelas dan murid.</p>
+      <ChartCard title="Class Bottleneck — Di mana?" description="Kelas dengan purata keputusan terkini terendah berdasarkan data tersedia.">
+        {classBottlenecks.length === 0 ? <EmptyBottleneck /> : <div className="space-y-3">{classBottlenecks.map((item, index) => <BottleneckRow key={item.key} rank={index + 1} item={item} students={studentMap} />)}</div>}
+        <p className="mt-3 text-[11px] text-slate-400">Klik murid terpilih untuk drilldown Student 360.</p>
       </ChartCard>
     </section>
 
-    <section className="grid grid-cols-1 gap-4 lg:grid-cols-3"><CommandQuestion title="1. Siapa paling perlu tindakan?" text={priorityQueue[0] ? `${priorityQueue[0].student.name} — ${priorityQueue[0].reason}` : 'Tiada calon dalam queue.'} /><CommandQuestion title="2. Adakah intervensi mencukupi?" text={`${activeInterventions} kes aktif untuk ${criticalHigh} murid Critical + High.`} warning={criticalHigh > activeInterventions} /><CommandQuestion title="3. Adakah data cukup untuk membuat keputusan?" text={unassessed ? `${unassessed} murid masih Unassessed.` : 'Coverage risiko lengkap untuk murid aktif.'} warning={unassessed > 0} /></section>
+    <section className="grid grid-cols-1 gap-4 lg:grid-cols-3"><CommandQuestion title="1. Siapa paling perlu tindakan?" text={priorityQueue[0] ? `${priorityQueue[0].student.name} — ${priorityQueue[0].reason}` : 'Tiada calon dalam queue.'} /><CommandQuestion title="2. Adakah intervensi mencukupi?" text={`${activeInterventionStudents} murid dengan kes aktif/monitoring untuk ${criticalHigh} murid Critical + High.`} warning={interventionGapCount > 0} /><CommandQuestion title="3. Adakah data cukup untuk membuat keputusan?" text={unassessed ? `${unassessed} murid masih Unassessed.` : error ? 'Data live gagal dimuatkan; keputusan tidak boleh dianggap lengkap.' : 'Coverage risiko lengkap untuk murid aktif.'} warning={unassessed > 0 || Boolean(error)} /></section>
     <section className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex items-start gap-3"><GraduationCap className="mt-0.5 text-teal-700" size={20}/><div><p className="font-bold text-navy-950">Prinsip Command Centre</p><p className="mt-1 text-sm text-slate-600">Dashboard ini bergerak daripada paparan KPI kepada keputusan: <strong>signal → bottleneck → murid → priority → action → follow-up</strong>. Data attendance yang digunakan ialah rekod agregat hari tidak hadir; kadar kehadiran tidak diandaikan tanpa denominator.</p></div></div></section>
   </div>;
 }
 
-function BottleneckRow({ rank, item }: { rank: number; item: { label: string; average: number; assessedStudents: number; severity: string; signal: string } }) { const critical = item.severity === 'Critical'; return <div className="rounded-xl border border-slate-200 p-3"><div className="flex items-center gap-3"><span className="w-6 text-center text-xs font-extrabold text-slate-400">{rank}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="font-extrabold text-navy-950">{item.label}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${critical ? 'bg-rose-100 text-rose-700' : item.severity === 'High' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{item.severity}</span></div><p className="mt-0.5 text-[11px] text-slate-500">{item.signal} • {item.assessedStudents} murid dinilai</p></div><div className="text-right"><span className="text-lg font-extrabold text-navy-950">{item.average}%</span><p className="text-[10px] text-slate-400">purata</p></div></div><div className="mt-2"><ProgressBar value={Math.min(100, item.average)} tone={critical ? 'gold' : 'teal'} /></div></div>; }
+function BottleneckRow({ rank, item, students }: { rank: number; item: { label: string; average: number; assessedStudents: number; affectedStudentIds: string[]; severity: string; signal: string }; students: Map<string, Student> }) {
+  const critical = item.severity === 'Critical';
+  const affected = item.affectedStudentIds.map((id) => students.get(id)).filter((student): student is Student => Boolean(student)).slice(0, 3);
+  return <div className="rounded-xl border border-slate-200 p-3"><div className="flex items-center gap-3"><span className="w-6 text-center text-xs font-extrabold text-slate-400">{rank}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="font-extrabold text-navy-950">{item.label}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${critical ? 'bg-rose-100 text-rose-700' : item.severity === 'High' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{item.severity}</span></div><p className="mt-0.5 text-[11px] text-slate-500">{item.signal} • {item.assessedStudents} murid dinilai</p></div><div className="text-right"><span className="text-lg font-extrabold text-navy-950">{item.average}%</span><p className="text-[10px] text-slate-400">purata</p></div></div><div className="mt-2"><ProgressBar value={Math.min(100, item.average)} tone={critical ? 'gold' : 'teal'} /></div>{affected.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{affected.map((student) => <Link key={student.id} to={`/students/${student.id}`} className="rounded-full bg-slate-50 px-2 py-1 text-[10px] font-semibold text-teal-700 hover:bg-slate-100">{student.name}</Link>)}</div>}</div>;
+}
 function EmptyBottleneck() { return <div className="flex items-center gap-2 py-10 text-sm text-slate-500"><TriangleAlert size={17}/> Belum ada data akademik mencukupi.</div>; }
 function ProgressOverview({ label, value, tone }: { label: string; value: number; tone: 'teal' | 'gold' | 'navy' }) { return <div><div className="mb-1 flex items-center justify-between text-sm"><span>{label}</span><span className="font-bold">{value}%</span></div><ProgressBar value={value} tone={tone}/></div>; }
 function Signal({ label, value, detail, critical }: { label: string; value: number; detail: string; critical: boolean }) { return <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2"><div><p className="text-xs font-bold text-navy-900">{label}</p><p className="text-[11px] text-slate-500">{detail}</p></div><span className={`text-lg font-extrabold ${critical ? 'text-rose-700' : 'text-teal-700'}`}>{value}</span></div>; }
