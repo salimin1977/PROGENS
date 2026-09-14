@@ -12,6 +12,8 @@ import Reap from './pages/Reap';
 import Stem from './pages/Stem';
 import Olympus from './pages/Olympus';
 import Nexus from './pages/Nexus';
+import Intelligence from './pages/Intelligence';
+import DataHealth from './pages/DataHealth';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 
@@ -31,6 +33,8 @@ export default function App() {
         <Route path="/stem" element={<Stem />} />
         <Route path="/olympus" element={<Olympus />} />
         <Route path="/nexus" element={<Nexus />} />
+        <Route path="/intelligence" element={<Intelligence />} />
+        <Route path="/data-health" element={<DataHealth />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
