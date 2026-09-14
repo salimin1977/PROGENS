@@ -68,14 +68,28 @@ export class SupabaseDataProvider implements DataProvider {
     const [{ data, error }, { data: subjects, error: subjectError }, { data: assessments, error: assessmentError }] = await Promise.all([
       db.from('academic_results').select('id,student_id,subject_id,assessment_id,marks,max_marks,grade'),
       db.from('subjects').select('id,name'),
-      db.from('assessments').select('id,assessment_type'),
+      db.from('assessments').select('id,assessment_type,name,assessment_date'),
     ]);
     if (error) throw error;
     if (subjectError) throw subjectError;
     if (assessmentError) throw assessmentError;
     const subjectMap = new Map((subjects ?? []).map((row) => [row.id, row.name]));
-    const assessmentMap = new Map((assessments ?? []).map((row) => [row.id, row.assessment_type]));
-    return (data ?? []).map((row) => ({ id: row.id, studentId: row.student_id, subject: subjectMap.get(row.subject_id) ?? row.subject_id, assessment: (assessmentMap.get(row.assessment_id) ?? 'PPT') as AcademicResult['assessment'], marks: Number(row.marks ?? 0), maximumMarks: Number(row.max_marks ?? 100), grade: row.grade ?? '' }));
+    const assessmentMap = new Map((assessments ?? []).map((row) => [row.id, row]));
+    return (data ?? []).map((row) => {
+      const assessment = assessmentMap.get(row.assessment_id);
+      return {
+        id: row.id,
+        studentId: row.student_id,
+        subject: subjectMap.get(row.subject_id) ?? row.subject_id,
+        assessment: (assessment?.assessment_type ?? 'PPT') as AcademicResult['assessment'],
+        assessmentId: row.assessment_id,
+        assessmentName: assessment?.name ?? '',
+        assessmentDate: assessment?.assessment_date ?? null,
+        marks: Number(row.marks ?? 0),
+        maximumMarks: Number(row.max_marks ?? 100),
+        grade: row.grade ?? '',
+      };
+    });
   }
 
   async getAttendance(): Promise<AttendanceRecord[]> {
