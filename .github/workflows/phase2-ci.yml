@@ -1,9 +1,9 @@
 name: PROGENS Build Validation
 on:
   push:
-    branches: ['main', 'phase-2-data-engine', 'phase-3-supabase-provider', 'feat/phase4-complete', 'feat/phase5-final', 'feat/phases6-8-complete']
+    branches: ['main', 'phase-2-data-engine', 'phase-3-supabase-provider', 'feat/phase4-complete', 'feat/phase5-final', 'feat/phases6-8-complete', 'feat/phase9-production']
   pull_request:
-    branches: ['main', 'phase-3-supabase-provider', 'feat/phase4-complete', 'feat/phase5-final', 'feat/phases6-8-complete']
+    branches: ['main', 'phase-3-supabase-provider', 'feat/phase4-complete', 'feat/phase5-final', 'feat/phases6-8-complete', 'feat/phase9-production']
   workflow_dispatch:
 jobs:
   build:
@@ -14,6 +14,6 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm install
+      - run: npm ci
       - run: npm run build
       - run: npm run lint
