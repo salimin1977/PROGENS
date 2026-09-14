@@ -41,95 +41,80 @@ npm run preview
 | `/stem` | STEM | STEM A pipeline |
 | `/olympus` | OLYMPUS | Strategic scorecard |
 | `/nexus` | NEXUS | Data and AI intelligence |
+| `/intelligence` | Intelligence | Cross-domain decision support |
+| `/data-health` | Data Health | Data quality governance |
+| `/production` | Production | Production readiness and release gate |
 | `/reports` | Reports | Reporting |
 | `/settings` | Settings | Configuration |
 
-## Phase 2 — Data Engine & Application Architecture
+## Operational Intelligence
 
-Phase 2 evolves the existing UI-first prototype without rebuilding the application.
+Phase 10 establishes the operating loop:
 
-### Architecture
+```text
+DATA
+  ↓
+SIGNAL
+  ↓
+BOTTLENECK
+  ↓
+STUDENT 360
+  ↓
+ACTION
+  ↓
+INTERVENTION
+  ↓
+FOLLOW-UP
+  ↓
+OUTCOME
+```
+
+`src/analytics/operationalIntelligenceEngine.ts` orchestrates current provider data into deterministic student-level operational signals and intervention-state summaries. It reuses the existing latest-assessment selector rather than creating a second assessment-selection rule.
+
+### Longitudinal pathway
+
+```text
+Tingkatan 1–3  →  SEEDS
+                    ↓
+Tingkatan 4    →  GROW
+                    ↓
+Tingkatan 5    →  REAP
+                    ↓
+                SPM readiness
+```
+
+Student 360 remains the longitudinal student view. Command remains the current decision surface. Intelligence remains decision support. Supabase remains the structured source of truth when configured.
+
+## Phase 9–10 Governance
+
+- Live and mock data must remain distinguishable.
+- Missing data is surfaced as a coverage gap, not invented.
+- Absence days are not converted into an attendance percentage without verified denominator/rate.
+- No government identity numbers are introduced or displayed.
+- No service-role credentials belong in browser code.
+- Existing Data Health and Production Readiness controls remain part of release review.
+- Phase 10 does not automatically create intervention history or claim causal impact.
+
+## Data Provider Architecture
 
 ```text
 PROGENS UI
     ↓
-React Hooks
-    ↓
-Domain Services
+React Hooks / Pages
     ↓
 Analytics / Business Logic
     ↓
 DataProvider
    ↙       ↘
-Mock     Supabase (Phase 3)
+Mock     Supabase
 ```
 
-### Data Provider
+`src/providers/DataProvider.ts` remains the persistence-independent contract. Pages should not bypass this boundary.
 
-`src/providers/DataProvider.ts` defines the persistence-independent contract. `MockDataProvider` is the current deterministic source. `SupabaseDataProvider` is an adapter boundary reserved for Phase 3 and requires no credentials in Phase 2.
+## Analytics
 
-### Domain Services
+Pure calculation modules live under `src/analytics/`. Existing academic, attendance, risk, intervention, SEEDS, GROW, REAP, STEM, KPI, bottleneck, intelligence, data-quality and production-readiness engines remain reusable.
 
-- `studentService.ts` — student retrieval, filtering, search and top-student queries.
-- `academicService.ts` — results by student, subject, class and assessment.
-- `attendanceService.ts` — attendance and configurable risk threshold.
-- `interventionService.ts` — intervention lifecycle operations.
-- `kpiService.ts` — dynamic school, academic, attendance, intervention and STEM KPI access.
+## Phase 10 limitation
 
-### Analytics Engine
-
-Pure calculation modules live under `src/analytics/`:
-
-- `academicAnalytics.ts` — GP, GPI, GPMP, GPS, pass rate, grade distribution, subject/class performance and assessment trends.
-- `attendanceAnalytics.ts` — attendance rate and attendance risk.
-- `riskAnalytics.ts` — multi-indicator student risk scoring.
-- `interventionAnalytics.ts` — indicator-driven intervention recommendations.
-- `seedsAnalytics.ts` — Foundation → Elite classification for Tingkatan 1–3.
-- `growAnalytics.ts` — strength, gap, target and action for Tingkatan 4.
-- `reapAnalytics.ts` — target gap, priority and SPM readiness for Tingkatan 5.
-- `stemAnalytics.ts` — STEM Elite / Boost / Rescue / Monitor classification.
-- `kpiAnalytics.ts` — dynamic school KPI aggregation and GPS gap.
-
-### KPI Convention
-
-GPS is a strategic school KPI where **lower is better**.
-
-```text
-GPS Semasa = 5.11
-GPS Sasaran = 4.84
-Jurang = 5.11 - 4.84 = 0.27
-```
-
-GPI, GPMP and GPS are kept as distinct concepts in the analytics API and should not be substituted for one another.
-
-### Risk Engine
-
-The risk engine uses G grades, subject failures, attendance and academic performance. The primary policy is:
-
-- 4+ G grades → Critical
-- 2–3 G grades → High
-- 1 G grade → Moderate
-- no G → Low unless other indicators elevate risk
-
-Attendance risk defaults to `< 90%` and is configurable.
-
-### Data Quality
-
-`src/utils/dataValidation.ts` detects duplicate student IDs, invalid marks, marks above maximum, missing student/class/subject fields and invalid grades. Invalid records are surfaced as validation issues rather than silently accepted.
-
-### Mock Data Policy
-
-The existing seeded generator remains available for prototype compatibility, but business logic is isolated into services and analytics. Student IDs are deterministic and stable for a given seed.
-
-### Supabase Roadmap
-
-Phase 3 will implement the `SupabaseDataProvider` against PostgreSQL tables and environment variables. UI pages and hooks should remain unchanged. No service keys, passwords, tokens or API credentials belong in source control.
-
-## Phase 3 Direction
-
-1. Connect Supabase/PostgreSQL.
-2. Add authentication and role-based access.
-3. Replace mock provider with live provider behind the same contract.
-4. Add persistence for interventions and audit logs.
-5. Add automated tests and CI build validation.
-6. Introduce AI insight services only after the live data model is validated.
+The current provider contract exposes intervention status and progress but does not expose a persistent intervention-action journal. Therefore Phase 10 summarizes the current intervention state safely. Full action/outcome history requires a future persistence contract and should not be fabricated in the UI.
